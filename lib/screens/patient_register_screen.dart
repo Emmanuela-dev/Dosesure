@@ -17,6 +17,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  String? _selectedDoctorId;
   bool _isLoading = false;
 
   @override
@@ -35,11 +36,18 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      String? doctorName;
+      if (_selectedDoctorId != null) {
+        final clinician = authProvider.getClinicianById(_selectedDoctorId!);
+        doctorName = clinician?['name'];
+      }
+
       await authProvider.register(
         _nameController.text.trim(),
         _emailController.text.trim(),
         _passwordController.text,
         UserRole.patient,
+        doctorName: doctorName,
       );
 
       if (mounted) {
@@ -123,6 +131,40 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                       return 'Please enter a valid email';
                     }
                     return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                Consumer<AuthProvider>(
+                  builder: (context, authProvider, child) {
+                    return DropdownButtonFormField<String>(
+                      value: _selectedDoctorId,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Your Doctor (Optional)',
+                        prefixIcon: Icon(Icons.medical_services),
+                        hintText: 'Choose your doctor from the list',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('No doctor selected'),
+                        ),
+                        ...authProvider.clinicians.map((clinician) {
+                          return DropdownMenuItem<String>(
+                            value: clinician['id'],
+                            child: Text(clinician['name']!),
+                          );
+                        }).toList(),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedDoctorId = value;
+                        });
+                      },
+                      validator: (value) {
+                        // Optional field, no validation required
+                        return null;
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 16),

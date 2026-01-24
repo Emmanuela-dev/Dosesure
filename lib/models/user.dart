@@ -5,12 +5,14 @@ class User {
   final String name;
   final String email;
   final UserRole role;
+  final String? doctorId; // For patients to link to their doctor
 
   User({
     required this.id,
     required this.name,
     required this.email,
     required this.role,
+    this.doctorId,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -19,6 +21,7 @@ class User {
       name: json['name'],
       email: json['email'],
       role: UserRole.values[json['role']],
+      doctorId: json['doctorId'],
     );
   }
 
@@ -28,6 +31,7 @@ class User {
       'name': name,
       'email': email,
       'role': role.index,
+      'doctorId': doctorId,
     };
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
+import '../providers/auth_provider.dart';
 import 'clinician_patients_screen.dart';
 import 'clinician_reports_screen.dart';
 
@@ -194,17 +195,18 @@ class _DashboardContent extends StatelessWidget {
   }
 
   Widget _buildPatientList(BuildContext context) {
-    return Consumer<HealthDataProvider>(
-      builder: (context, healthData, child) {
+    return Consumer2<HealthDataProvider, AuthProvider>(
+      builder: (context, healthData, authProvider, child) {
         final medications = healthData.medications;
         final sideEffects = healthData.sideEffects;
         final herbalUses = healthData.herbalUses.where((h) => h.isActive).toList();
         final adherence = healthData.getAdherencePercentage();
 
-        // Mock patient data - in real app, this would come from API
+        // Mock patient data - in real app, this would come from API filtered by current clinician
         final patients = [
           {
             'name': 'John Doe',
+            'doctorId': 'clinician_1',
             'medications': medications.length,
             'sideEffects': sideEffects.length,
             'herbalUses': herbalUses.length,
@@ -214,13 +216,13 @@ class _DashboardContent extends StatelessWidget {
         ];
 
         return Column(
-          children: patients.map((patient) => _buildPatientCard(context, patient)).toList(),
+          children: patients.map((patient) => _buildPatientCard(context, patient, authProvider)).toList(),
         );
       },
     );
   }
 
-  Widget _buildPatientCard(BuildContext context, Map<String, dynamic> patient) {
+  Widget _buildPatientCard(BuildContext context, Map<String, dynamic> patient, AuthProvider authProvider) {
     Color statusColor;
     final status = patient['status'] as String;
     switch (status) {
@@ -277,6 +279,14 @@ class _DashboardContent extends StatelessWidget {
                 Text('Medications: ${patient['medications']}'),
                 Text('Side Effects Reported: ${patient['sideEffects']}'),
                 Text('Herbal Medicines: ${patient['herbalUses']}'),
+                Builder(
+                  builder: (context) {
+                    final doctorId = patient['doctorId'] as String?;
+                    final clinician = doctorId != null ? authProvider.getClinicianById(doctorId) : null;
+                    final doctorName = clinician?['name'] ?? 'Unknown Doctor';
+                    return Text('Doctor: $doctorName');
+                  },
+                ),
               ],
             ),
           ),

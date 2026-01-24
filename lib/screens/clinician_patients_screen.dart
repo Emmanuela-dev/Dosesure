@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
+import '../providers/auth_provider.dart';
 
 class ClinicianPatientsScreen extends StatelessWidget {
   const ClinicianPatientsScreen({super.key});
@@ -9,7 +10,7 @@ class ClinicianPatientsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Patients'),
+        title: const Text('My Patients'),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -26,17 +27,19 @@ class ClinicianPatientsScreen extends StatelessWidget {
         ],
       ),
       body: SafeArea(
-        child: Consumer<HealthDataProvider>(
-          builder: (context, healthData, child) {
+        child: Consumer2<HealthDataProvider, AuthProvider>(
+          builder: (context, healthData, authProvider, child) {
             final medications = healthData.medications.length;
             final sideEffects = healthData.sideEffects.length;
             final herbalUses = healthData.herbalUses.where((h) => h.isActive).toList().length;
             final adherence = healthData.getAdherencePercentage();
 
-            // Mock patient data - in real app, this would come from API
+            // Mock patient data - in real app, this would come from API filtered by current clinician
+            // For demo, showing patients linked to "Dr. Smith" (clinician_1)
             final patients = [
               {
                 'name': 'John Doe',
+                'doctorId': 'clinician_1',
                 'medications': medications,
                 'sideEffects': sideEffects,
                 'herbalUses': herbalUses,
@@ -47,6 +50,7 @@ class ClinicianPatientsScreen extends StatelessWidget {
               },
               {
                 'name': 'Jane Smith',
+                'doctorId': 'clinician_1',
                 'medications': 3,
                 'sideEffects': 1,
                 'herbalUses': 0,
@@ -57,6 +61,7 @@ class ClinicianPatientsScreen extends StatelessWidget {
               },
               {
                 'name': 'Bob Johnson',
+                'doctorId': 'clinician_1',
                 'medications': 2,
                 'sideEffects': 0,
                 'herbalUses': 1,
@@ -139,6 +144,15 @@ class ClinicianPatientsScreen extends StatelessWidget {
                 Text('Side Effects Reported: ${patient['sideEffects']}'),
                 Text('Herbal Medicines: ${patient['herbalUses']}'),
                 const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final doctorId = patient['doctorId'] as String?;
+                    final clinician = doctorId != null ? authProvider.getClinicianById(doctorId) : null;
+                    final doctorName = clinician?['name'] ?? 'Unknown Doctor';
+                    return Text('Doctor: $doctorName');
+                  },
+                ),
                 Text('Last Check-in: ${patient['lastCheckIn']}'),
                 Text('Next Appointment: ${patient['nextAppointment']}'),
                 const SizedBox(height: 12),
