@@ -39,7 +39,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       String? doctorName;
       if (_selectedDoctorId != null) {
         final clinician = authProvider.getClinicianById(_selectedDoctorId!);
-        doctorName = clinician?['name'];
+        doctorName = clinician?.name;
       }
 
       await authProvider.register(
@@ -150,8 +150,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                         ),
                         ...authProvider.clinicians.map((clinician) {
                           return DropdownMenuItem<String>(
-                            value: clinician['id'],
-                            child: Text(clinician['name']!),
+                            value: clinician.id,
+                            child: Text(clinician.name),
                           );
                         }).toList(),
                       ],

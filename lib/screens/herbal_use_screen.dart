@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/herbal_use.dart';
 
 class HerbalUseScreen extends StatefulWidget {
@@ -41,7 +42,9 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
     );
 
-    Provider.of<HealthDataProvider>(context, listen: false).addHerbalUse(herbalUse);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await Provider.of<HealthDataProvider>(context, listen: false)
+        .addHerbalUse(authProvider.currentUser!.id, herbalUse);
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Herbal use added successfully')),

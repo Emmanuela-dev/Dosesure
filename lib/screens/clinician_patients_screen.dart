@@ -149,7 +149,7 @@ class ClinicianPatientsScreen extends StatelessWidget {
                     final authProvider = Provider.of<AuthProvider>(context, listen: false);
                     final doctorId = patient['doctorId'] as String?;
                     final clinician = doctorId != null ? authProvider.getClinicianById(doctorId) : null;
-                    final doctorName = clinician?['name'] ?? 'Unknown Doctor';
+                    final doctorName = clinician?.name ?? 'Unknown Doctor';
                     return Text('Doctor: $doctorName');
                   },
                 ),

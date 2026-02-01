@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/user.dart';
 import 'patient_login_screen.dart';
 import 'clinician_login_screen.dart';
 

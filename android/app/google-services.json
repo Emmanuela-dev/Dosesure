@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "176011686004",
+    "project_id": "bitelab-ab051",
+    "storage_bucket": "bitelab-ab051.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:176011686004:android:2a7eb494cfef4116032121",
+        "android_client_info": {
+          "package_name": "bite.lab"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBliHU6r-Yr1Vt_bdUcSrKHc8-ATZKtUlU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

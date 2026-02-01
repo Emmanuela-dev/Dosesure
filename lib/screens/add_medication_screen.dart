@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/medication.dart';
 
 class AddMedicationScreen extends StatefulWidget {
@@ -81,7 +82,9 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       startDate: DateTime.now(),
     );
 
-    Provider.of<HealthDataProvider>(context, listen: false).addMedication(medication);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await Provider.of<HealthDataProvider>(context, listen: false)
+        .addMedication(authProvider.currentUser!.id, medication);
 
     Navigator.of(context).pop();
   }

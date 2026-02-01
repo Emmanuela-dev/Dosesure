@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/side_effect.dart';
 import '../models/medication.dart';
 
@@ -43,7 +44,9 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
     );
 
-    Provider.of<HealthDataProvider>(context, listen: false).addSideEffect(sideEffect);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await Provider.of<HealthDataProvider>(context, listen: false)
+        .addSideEffect(authProvider.currentUser!.id, sideEffect);
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Side effect reported successfully')),

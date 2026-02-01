@@ -19,6 +19,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkAuth() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Initialize auth state listener
+    authProvider.initAuthStateListener();
+    
+    // Load clinicians for registration
+    await authProvider.loadClinicians();
+    
+    // Load user if exists
     await authProvider.loadUser();
 
     // Simulate loading time
