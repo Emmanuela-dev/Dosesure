@@ -98,11 +98,7 @@ class AuthProvider with ChangeNotifier {
       // Validate doctor exists if doctorName is provided
       String? doctorId;
       if (doctorName != null && doctorName.isNotEmpty) {
-        // Load clinicians if not loaded
-        if (_clinicians.isEmpty) {
-          await loadClinicians();
-        }
-        
+        // Clinicians should already be loaded, but check just in case
         final clinician = getClinicianByName(doctorName);
         if (clinician == null) {
           throw Exception('Doctor "$doctorName" not found. Please ensure the doctor has an account in the app.');

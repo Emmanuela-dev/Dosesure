@@ -21,6 +21,18 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Load clinicians when screen opens to avoid delay during registration
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.clinicians.isEmpty) {
+        authProvider.loadClinicians();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
