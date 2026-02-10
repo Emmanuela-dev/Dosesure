@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
 import 'clinician_dashboard_screen.dart';
+import 'clinician_register_screen.dart';
 
 class ClinicianLoginScreen extends StatefulWidget {
   const ClinicianLoginScreen({super.key});
@@ -16,6 +17,7 @@ class _ClinicianLoginScreenState extends State<ClinicianLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -109,11 +111,21 @@ class _ClinicianLoginScreenState extends State<ClinicianLoginScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock),
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                   ),
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your password';
@@ -130,6 +142,15 @@ class _ClinicianLoginScreenState extends State<ClinicianLoginScreen> {
                   child: _isLoading
                       ? const CircularProgressIndicator()
                       : const Text('Login'),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ClinicianRegisterScreen()),
+                    );
+                  },
+                  child: const Text('Don\'t have an account? Register'),
                 ),
               ],
             ),

@@ -69,13 +69,19 @@ class AuthProvider with ChangeNotifier {
       _currentUser = await _authService.signInWithEmailAndPassword(
         email: email,
         password: password,
+        defaultRole: role, // Pass the expected role for auto-creation
       );
 
-      // Verify role matches
+      // If role doesn't match, update it in Firestore
       if (_currentUser!.role != role) {
-        await _authService.signOut();
-        _currentUser = null;
-        throw Exception('Invalid credentials for this user type');
+        _currentUser = User(
+          id: _currentUser!.id,
+          name: _currentUser!.name,
+          email: _currentUser!.email,
+          role: role,
+          doctorId: _currentUser!.doctorId,
+        );
+        await _firestoreService.updateUser(_currentUser!);
       }
 
       final prefs = await SharedPreferences.getInstance();

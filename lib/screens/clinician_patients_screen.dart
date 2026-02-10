@@ -1,10 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/firestore_service.dart';
+import '../models/user.dart';
 
-class ClinicianPatientsScreen extends StatelessWidget {
+class ClinicianPatientsScreen extends StatefulWidget {
   const ClinicianPatientsScreen({super.key});
+
+  @override
+  State<ClinicianPatientsScreen> createState() => _ClinicianPatientsScreenState();
+}
+
+class _ClinicianPatientsScreenState extends State<ClinicianPatientsScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  List<User> _patients = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPatients();
+  }
+
+  Future<void> _loadPatients() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUser = authProvider.currentUser;
+    
+    if (currentUser != null && currentUser.role == UserRole.clinician) {
+      try {
+        final patients = await _firestoreService.getPatientsForClinician(currentUser.id);
+        setState(() {
+          _patients = patients;
+          _isLoading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        if (mounted) {
+          String errorMessage = 'Error loading patients';
+          
+          // Check for specific Firestore errors
+          if (e.toString().contains('PERMISSION_DENIED') || 
+              e.toString().contains('has not been used') ||
+              e.toString().contains('is disabled')) {
+            errorMessage = 'Firestore is not enabled. Please enable Cloud Firestore in Firebase Console and restart the app.';
+          } else if (e.toString().contains('network')) {
+            errorMessage = 'Network error. Please check your internet connection.';
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: _loadPatients,
+              ),
+            ),
+          );
+        }
+      }
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,96 +78,51 @@ class ClinicianPatientsScreen extends StatelessWidget {
         title: const Text('My Patients'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: Implement search
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () {
-              // TODO: Implement filter
-            },
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadPatients,
           ),
         ],
       ),
       body: SafeArea(
-        child: Consumer2<HealthDataProvider, AuthProvider>(
-          builder: (context, healthData, authProvider, child) {
-            final medications = healthData.medications.length;
-            final sideEffects = healthData.sideEffects.length;
-            final herbalUses = healthData.herbalUses.where((h) => h.isActive).toList().length;
-            final adherence = healthData.getAdherencePercentage();
-
-            // Mock patient data - in real app, this would come from API filtered by current clinician
-            // For demo, showing patients linked to "Dr. Smith" (clinician_1)
-            final patients = [
-              {
-                'name': 'John Doe',
-                'doctorId': 'clinician_1',
-                'medications': medications,
-                'sideEffects': sideEffects,
-                'herbalUses': herbalUses,
-                'adherence': adherence,
-                'status': adherence >= 80 ? 'Good' : 'Needs Attention',
-                'lastCheckIn': '2 hours ago',
-                'nextAppointment': 'Tomorrow, 10:00 AM'
-              },
-              {
-                'name': 'Jane Smith',
-                'doctorId': 'clinician_1',
-                'medications': 3,
-                'sideEffects': 1,
-                'herbalUses': 0,
-                'adherence': 75.0,
-                'status': 'Needs Attention',
-                'lastCheckIn': '1 day ago',
-                'nextAppointment': 'Next week'
-              },
-              {
-                'name': 'Bob Johnson',
-                'doctorId': 'clinician_1',
-                'medications': 2,
-                'sideEffects': 0,
-                'herbalUses': 1,
-                'adherence': 90.0,
-                'status': 'Good',
-                'lastCheckIn': '30 min ago',
-                'nextAppointment': 'In 3 days'
-              },
-            ];
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: patients.length,
-              itemBuilder: (context, index) {
-                final patient = patients[index];
-                return _buildPatientCard(context, patient);
-              },
-            );
-          },
-        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _patients.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No patients linked yet',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Patients will appear here when they\nselect you as their doctor during registration',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16.0),
+                    itemCount: _patients.length,
+                    itemBuilder: (context, index) {
+                      final patient = _patients[index];
+                      return _buildPatientCard(context, patient);
+                    },
+                  ),
       ),
     );
   }
 
-  Widget _buildPatientCard(BuildContext context, Map<String, dynamic> patient) {
-    Color statusColor;
-    final status = patient['status'] as String;
-    switch (status) {
-      case 'Excellent':
-        statusColor = Colors.green;
-        break;
-      case 'Good':
-        statusColor = Colors.blue;
-        break;
-      case 'Needs Attention':
-        statusColor = Colors.orange;
-        break;
-      default:
-        statusColor = Colors.grey;
-    }
-
+  Widget _buildPatientCard(BuildContext context, User patient) {
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
@@ -113,22 +133,22 @@ class ClinicianPatientsScreen extends StatelessWidget {
         leading: CircleAvatar(
           backgroundColor: Theme.of(context).primaryColor,
           child: Text(
-            (patient['name'] as String).split(' ').map((e) => e[0]).join(),
+            patient.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join(),
             style: const TextStyle(color: Colors.white),
           ),
         ),
-        title: Text(patient['name'] as String),
-        subtitle: Text('Adherence: ${(patient['adherence'] as double).toStringAsFixed(0)}%'),
+        title: Text(patient.name),
+        subtitle: Text(patient.email),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
+            color: Colors.blue.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            status,
+          child: const Text(
+            'Patient',
             style: TextStyle(
-              color: statusColor,
+              color: Colors.blue,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -140,39 +160,21 @@ class ClinicianPatientsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Medications: ${patient['medications']}'),
-                Text('Side Effects Reported: ${patient['sideEffects']}'),
-                Text('Herbal Medicines: ${patient['herbalUses']}'),
-                const SizedBox(height: 8),
-                Builder(
-                  builder: (context) {
-                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                    final doctorId = patient['doctorId'] as String?;
-                    final clinician = doctorId != null ? authProvider.getClinicianById(doctorId) : null;
-                    final doctorName = clinician?.name ?? 'Unknown Doctor';
-                    return Text('Doctor: $doctorName');
-                  },
-                ),
-                Text('Last Check-in: ${patient['lastCheckIn']}'),
-                Text('Next Appointment: ${patient['nextAppointment']}'),
+                Text('Email: ${patient.email}'),
+                Text('Patient ID: ${patient.id}'),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         onPressed: () {
-                          // TODO: Navigate to patient details
+                          // TODO: Navigate to patient details/health data
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Viewing ${patient.name}\'s health data')),
+                          );
                         },
-                        child: const Text('View Details'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // TODO: Contact patient
-                        },
-                        child: const Text('Contact'),
+                        icon: const Icon(Icons.visibility, size: 18),
+                        label: const Text('View Health Data'),
                       ),
                     ),
                   ],

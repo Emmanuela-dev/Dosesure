@@ -54,6 +54,7 @@ class FirebaseAuthService {
   Future<User> signInWithEmailAndPassword({
     required String email,
     required String password,
+    UserRole? defaultRole,
   }) async {
     try {
       final credential = await _auth.signInWithEmailAndPassword(
@@ -62,9 +63,19 @@ class FirebaseAuthService {
       );
 
       // Get user data from Firestore
-      final user = await _firestoreService.getUser(credential.user!.uid);
+      var user = await _firestoreService.getUser(credential.user!.uid);
+      
+      // If user document doesn't exist in Firestore, create it
       if (user == null) {
-        throw Exception('User data not found');
+        user = User(
+          id: credential.user!.uid,
+          name: credential.user!.displayName ?? 'User',
+          email: credential.user!.email!,
+          role: defaultRole ?? UserRole.patient, // Use specified role or default to patient
+          doctorId: null,
+        );
+        
+        await _firestoreService.createUser(user);
       }
 
       return user;

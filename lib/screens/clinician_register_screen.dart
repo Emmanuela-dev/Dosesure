@@ -2,37 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
-import 'patient_home_screen.dart';
+import 'clinician_dashboard_screen.dart';
 
-class PatientRegisterScreen extends StatefulWidget {
-  const PatientRegisterScreen({super.key});
+class ClinicianRegisterScreen extends StatefulWidget {
+  const ClinicianRegisterScreen({super.key});
 
   @override
-  State<PatientRegisterScreen> createState() => _PatientRegisterScreenState();
+  State<ClinicianRegisterScreen> createState() => _ClinicianRegisterScreenState();
 }
 
-class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
+class _ClinicianRegisterScreenState extends State<ClinicianRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  String? _selectedDoctorId;
+  final _specialtyController = TextEditingController();
+  final _licenseNumberController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
-  @override
-  void initState() {
-    super.initState();
-    // Load clinicians when screen opens to avoid delay during registration
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.clinicians.isEmpty) {
-        authProvider.loadClinicians();
-      }
-    });
-  }
 
   @override
   void dispose() {
@@ -40,6 +29,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _specialtyController.dispose();
+    _licenseNumberController.dispose();
     super.dispose();
   }
 
@@ -50,27 +41,47 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      String? doctorName;
-      if (_selectedDoctorId != null) {
-        final clinician = authProvider.getClinicianById(_selectedDoctorId!);
-        doctorName = clinician?.name;
+      
+      // Show initial feedback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Setting up your account...'),
+              ],
+            ),
+            duration: Duration(seconds: 30),
+          ),
+        );
       }
-
+      
       await authProvider.register(
         _nameController.text.trim(),
         _emailController.text.trim(),
         _passwordController.text,
-        UserRole.patient,
-        doctorName: doctorName,
+        UserRole.clinician,
       );
 
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const PatientHomeScreen()),
+          MaterialPageRoute(builder: (_) => const ClinicianDashboardScreen()),
         );
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        
         String errorMessage = 'Registration failed: ${e.toString()}';
         
         // Check for specific Firestore errors
@@ -99,7 +110,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Patient Registration'),
+        title: const Text('Clinician Registration'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -110,13 +121,13 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Icon(
-                  Icons.person_add,
+                  Icons.medical_services,
                   size: 80,
                   color: Theme.of(context).primaryColor,
                 ),
                 const SizedBox(height: 32),
                 Text(
-                  'Create Account',
+                  'Create Clinician Account',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -124,7 +135,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Join DoseSure to manage your health',
+                  'Join DoseSure to monitor your patients',
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -134,6 +145,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Full Name',
                     prefixIcon: Icon(Icons.person),
+                    hintText: 'Dr. John Smith',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -148,6 +160,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email),
+                    hintText: 'doctor@hospital.com',
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
@@ -161,38 +174,22 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    return DropdownButtonFormField<String>(
-                      value: _selectedDoctorId,
-                      decoration: const InputDecoration(
-                        labelText: 'Select Your Doctor (Optional)',
-                        prefixIcon: Icon(Icons.medical_services),
-                        hintText: 'Choose your doctor from the list',
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('No doctor selected'),
-                        ),
-                        ...authProvider.clinicians.map((clinician) {
-                          return DropdownMenuItem<String>(
-                            value: clinician.id,
-                            child: Text(clinician.name),
-                          );
-                        }).toList(),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedDoctorId = value;
-                        });
-                      },
-                      validator: (value) {
-                        // Optional field, no validation required
-                        return null;
-                      },
-                    );
-                  },
+                TextFormField(
+                  controller: _specialtyController,
+                  decoration: const InputDecoration(
+                    labelText: 'Specialty (Optional)',
+                    prefixIcon: Icon(Icons.health_and_safety),
+                    hintText: 'Cardiology, Neurology, etc.',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _licenseNumberController,
+                  decoration: const InputDecoration(
+                    labelText: 'Medical License Number (Optional)',
+                    prefixIcon: Icon(Icons.badge),
+                    hintText: 'License number',
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -271,6 +268,13 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                           )
                         : const Text('Register'),
                   ),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Already have an account? Login'),
                 ),
               ],
             ),

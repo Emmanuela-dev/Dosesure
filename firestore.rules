@@ -29,14 +29,20 @@ service cloud.firestore {
     
     // User documents
     match /users/{userId} {
-      // Users can read and write their own profile
+      // Allow authenticated users to read and write their own profile
       allow read, write: if isOwner(userId);
       
+      // Allow user creation during registration (when auth uid matches document id)
+      allow create: if request.auth.uid == userId;
+      
       // Clinicians can read their patients' profiles
-      allow read: if canAccessPatientData(userId);
+      allow read: if isAuthenticated() && canAccessPatientData(userId);
       
       // Allow reading all clinicians (for patient registration)
-      allow read: if isAuthenticated() && getUserData(userId).role == 0;
+      allow read: if isAuthenticated() && resource.data.role == 0;
+      
+      // Allow listing all clinicians for patient registration dropdown
+      allow list: if isAuthenticated();
     }
     
     // Medication documents
