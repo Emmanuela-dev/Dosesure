@@ -6,6 +6,7 @@ import 'providers/auth_provider.dart';
 import 'providers/health_data_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,13 @@ void main() async {
     debugPrint('Firebase initialization error: $e');
     // App will still run but Firebase features won't work
     // This allows development without Firebase configuration
+  }
+
+  // Initialize notification service
+  try {
+    await NotificationService().initialize();
+  } catch (e) {
+    debugPrint('Notification service initialization error: $e');
   }
   
   runApp(const MyApp());

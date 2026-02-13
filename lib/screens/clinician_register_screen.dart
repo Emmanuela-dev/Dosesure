@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
-import 'clinician_dashboard_screen.dart';
+import 'clinician_login_screen.dart';
 
 class ClinicianRegisterScreen extends StatefulWidget {
   const ClinicianRegisterScreen({super.key});
@@ -72,10 +72,19 @@ class _ClinicianRegisterScreenState extends State<ClinicianRegisterScreen> {
         UserRole.clinician,
       );
 
+      // Sign out after registration so user can log in
+      await authProvider.logout();
+
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully! Please log in.'),
+            backgroundColor: Colors.green,
+          ),
+        );
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const ClinicianDashboardScreen()),
+          MaterialPageRoute(builder: (_) => const ClinicianLoginScreen()),
         );
       }
     } catch (e) {

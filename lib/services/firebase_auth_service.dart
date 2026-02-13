@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import 'firestore_service.dart';
 
@@ -62,11 +63,17 @@ class FirebaseAuthService {
         password: password,
       );
 
+      debugPrint('Firebase Auth - User UID: ${credential.user!.uid}');
+      debugPrint('Firebase Auth - Display Name: ${credential.user!.displayName}');
+
       // Get user data from Firestore
       var user = await _firestoreService.getUser(credential.user!.uid);
       
+      debugPrint('Firestore User - Name: ${user?.name}, Email: ${user?.email}, Role: ${user?.role}');
+      
       // If user document doesn't exist in Firestore, create it
       if (user == null) {
+        debugPrint('User not found in Firestore, creating new document...');
         user = User(
           id: credential.user!.uid,
           name: credential.user!.displayName ?? 'User',
@@ -76,11 +83,26 @@ class FirebaseAuthService {
         );
         
         await _firestoreService.createUser(user);
+      } else if (user.name == 'User' && credential.user!.displayName != null && credential.user!.displayName!.isNotEmpty) {
+        // If Firestore has default name but Firebase Auth has display name, update it
+        debugPrint('Updating user name from Firebase Auth displayName: ${credential.user!.displayName}');
+        user = User(
+          id: user.id,
+          name: credential.user!.displayName!,
+          email: user.email,
+          role: user.role,
+          doctorId: user.doctorId,
+        );
+        await _firestoreService.updateUser(user);
       }
 
       return user;
     } on firebase_auth.FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
+    } catch (e) {
+      // Handle other exceptions (Firestore errors, network issues, etc.)
+      debugPrint('Login error: $e');
+      throw 'Login failed: ${e.toString()}';
     }
   }
 
@@ -124,6 +146,8 @@ class FirebaseAuthService {
         return 'No user found for that email.';
       case 'wrong-password':
         return 'Wrong password provided.';
+      case 'invalid-credential':
+        return 'Invalid email or password.';
       case 'invalid-email':
         return 'The email address is not valid.';
       case 'user-disabled':
@@ -132,6 +156,8 @@ class FirebaseAuthService {
         return 'Too many requests. Please try again later.';
       case 'operation-not-allowed':
         return 'This operation is not allowed.';
+      case 'network-request-failed':
+        return 'Network error. Please check your connection.';
       default:
         return 'An error occurred. Please try again.';
     }

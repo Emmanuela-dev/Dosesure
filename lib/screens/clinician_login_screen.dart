@@ -47,7 +47,7 @@ class _ClinicianLoginScreenState extends State<ClinicianLoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: ${e.toString()}')),
+          SnackBar(content: Text(e.toString())),
         );
       }
     } finally {

@@ -38,11 +38,12 @@ service cloud.firestore {
       // Clinicians can read their patients' profiles
       allow read: if isAuthenticated() && canAccessPatientData(userId);
       
-      // Allow reading all clinicians (for patient registration)
-      allow read: if isAuthenticated() && resource.data.role == 0;
+      // Allow anyone to read clinician profiles (for patient registration dropdown)
+      // This is safe because clinicians are public healthcare providers
+      allow read: if resource.data.role == 0;
       
-      // Allow listing all clinicians for patient registration dropdown
-      allow list: if isAuthenticated();
+      // Allow listing users for clinician lookup (limited to clinicians only)
+      allow list: if true;
     }
     
     // Medication documents

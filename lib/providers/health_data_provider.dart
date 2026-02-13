@@ -5,9 +5,11 @@ import '../models/dose_log.dart';
 import '../models/side_effect.dart';
 import '../models/herbal_use.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 
 class HealthDataProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
+  final NotificationService _notificationService = NotificationService();
   
   List<Medication> _medications = [];
   List<DoseLog> _doseLogs = [];
@@ -37,6 +39,8 @@ class HealthDataProvider with ChangeNotifier {
         .getActiveMedicationsForUser(userId)
         .listen((medications) {
       _medications = medications;
+      // Schedule reminders for all active medications
+      _notificationService.scheduleAllMedicationReminders(medications);
       notifyListeners();
     });
 
@@ -102,6 +106,9 @@ class HealthDataProvider with ChangeNotifier {
       
       await _firestoreService.addMedication(userId, medication);
       
+      // Schedule medication reminders
+      await _notificationService.scheduleMedicationReminders(medication);
+      
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -119,6 +126,9 @@ class HealthDataProvider with ChangeNotifier {
       
       await _firestoreService.updateMedication(medication);
       
+      // Reschedule medication reminders (will cancel existing and create new ones)
+      await _notificationService.scheduleMedicationReminders(medication);
+      
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -135,6 +145,9 @@ class HealthDataProvider with ChangeNotifier {
       notifyListeners();
       
       await _firestoreService.deleteMedication(medicationId);
+      
+      // Cancel medication reminders
+      await _notificationService.cancelMedicationReminders(medicationId);
       
       _isLoading = false;
       notifyListeners();

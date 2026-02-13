@@ -28,33 +28,25 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     super.dispose();
   }
 
-  void _addTime() {
-    showDialog(
+  void _addTime() async {
+    final TimeOfDay? picked = await showTimePicker(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Time'),
-        content: TextField(
-          decoration: const InputDecoration(
-            labelText: 'Time (HH:MM)',
-            hintText: '08:00',
-          ),
-          onSubmitted: (value) {
-            if (value.isNotEmpty) {
-              setState(() {
-                _times.add(value);
-              });
-              Navigator.of(context).pop();
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+      initialTime: TimeOfDay.now(),
+      helpText: 'Select medication time',
     );
+
+    if (picked != null) {
+      // Format as HH:MM (24-hour format)
+      final hour = picked.hour.toString().padLeft(2, '0');
+      final minute = picked.minute.toString().padLeft(2, '0');
+      final timeString = '$hour:$minute';
+      
+      setState(() {
+        _times.add(timeString);
+        // Sort times chronologically
+        _times.sort();
+      });
+    }
   }
 
   void _removeTime(int index) {
@@ -82,11 +74,33 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       startDate: DateTime.now(),
     );
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await Provider.of<HealthDataProvider>(context, listen: false)
-        .addMedication(authProvider.currentUser!.id, medication);
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await Provider.of<HealthDataProvider>(context, listen: false)
+          .addMedication(authProvider.currentUser!.id, medication);
 
-    Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${medication.name} added! Reminders set for: ${_times.join(", ")}',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding medication: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override

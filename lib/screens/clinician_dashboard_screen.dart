@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/firestore_service.dart';
+import '../models/user.dart';
 import 'clinician_patients_screen.dart';
 import 'clinician_reports_screen.dart';
 import 'drug_interaction_screen.dart';
@@ -79,23 +81,76 @@ class _ClinicianDashboardScreenState extends State<ClinicianDashboardScreen> {
   }
 }
 
-class _DashboardContent extends StatelessWidget {
+class _DashboardContent extends StatefulWidget {
   const _DashboardContent();
 
   @override
+  State<_DashboardContent> createState() => _DashboardContentState();
+}
+
+class _DashboardContentState extends State<_DashboardContent> {
+  final FirestoreService _firestoreService = FirestoreService();
+  List<User> _patients = [];
+  bool _isLoadingPatients = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPatients();
+  }
+
+  Future<void> _loadPatients() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUser = authProvider.currentUser;
+    
+    if (currentUser != null && currentUser.role == UserRole.clinician) {
+      try {
+        final patients = await _firestoreService.getPatientsForClinician(currentUser.id);
+        if (mounted) {
+          setState(() {
+            _patients = patients;
+            _isLoadingPatients = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading patients: $e');
+        if (mounted) {
+          setState(() {
+            _isLoadingPatients = false;
+          });
+        }
+      }
+    } else {
+      setState(() {
+        _isLoadingPatients = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Welcome, Dr. Smith',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final currentUser = authProvider.currentUser;
+        final userName = (currentUser?.name != null && 
+                          currentUser!.name.isNotEmpty && 
+                          currentUser.name != 'User') 
+            ? currentUser.name 
+            : (currentUser?.email?.split('@').first ?? 'Doctor');
+        debugPrint('Dashboard - Current user name: ${currentUser?.name}, Displayed: $userName');
+        
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome, $userName',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
             const SizedBox(height: 8),
             Text(
               'Monitor your patients\' medication adherence',
@@ -106,17 +161,29 @@ class _DashboardContent extends StatelessWidget {
             const SizedBox(height: 32),
             _buildDrugInteractionPreview(context),
             const SizedBox(height: 32),
-            Text(
-              'Patient List',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Patient List',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadPatients,
+                  tooltip: 'Refresh patient list',
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             _buildPatientList(context),
           ],
         ),
       ),
+    );
+      },
     );
   }
 
@@ -490,103 +557,85 @@ class _DashboardContent extends StatelessWidget {
   }
 
   Widget _buildPatientList(BuildContext context) {
-    return Consumer2<HealthDataProvider, AuthProvider>(
-      builder: (context, healthData, authProvider, child) {
-        final medications = healthData.medications;
-        final sideEffects = healthData.sideEffects;
-        final herbalUses = healthData.herbalUses.where((h) => h.isActive).toList();
-        final adherence = healthData.getAdherencePercentage();
+    if (_isLoadingPatients) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
-        // Mock patient data - in real app, this would come from API filtered by current clinician
-        final patients = [
-          {
-            'name': 'John Doe',
-            'doctorId': 'clinician_1',
-            'medications': medications.length,
-            'sideEffects': sideEffects.length,
-            'herbalUses': herbalUses.length,
-            'adherence': adherence,
-            'status': adherence >= 80 ? 'Good' : 'Needs Attention'
-          },
-        ];
+    if (_patients.isEmpty) {
+      return Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            children: [
+              Icon(
+                Icons.people_outline,
+                size: 48,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No patients yet',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Patients who select you as their doctor will appear here.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
-        return Column(
-          children: patients.map((patient) => _buildPatientCard(context, patient, authProvider)).toList(),
-        );
-      },
+    return Column(
+      children: _patients.map((patient) => _buildPatientCard(context, patient)).toList(),
     );
   }
 
-  Widget _buildPatientCard(
-      BuildContext context, Map<String, dynamic> patient, AuthProvider authProvider) {
-    Color statusColor;
-    final status = patient['status'] as String;
-    switch (status) {
-      case 'Excellent':
-        statusColor = Colors.green;
-        break;
-      case 'Good':
-        statusColor = Colors.blue;
-        break;
-      case 'Needs Attention':
-        statusColor = Colors.orange;
-        break;
-      default:
-        statusColor = Colors.grey;
-    }
-
+  Widget _buildPatientCard(BuildContext context, User patient) {
+    // TODO: In a real app, fetch actual patient health data
+    // For now, showing patient info without health metrics
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: ExpansionTile(
+      child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Theme.of(context).primaryColor,
           child: Text(
-            (patient['name'] as String).split(' ').map((e) => e[0]).join(),
+            patient.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase(),
             style: const TextStyle(color: Colors.white),
           ),
         ),
-        title: Text(patient['name'] as String),
-        subtitle: Text('Adherence: ${(patient['adherence'] as double).toStringAsFixed(0)}%'),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            status,
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+        title: Text(patient.name),
+        subtitle: Text(patient.email),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          // Navigate to patient details
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('View details for ${patient.name}'),
+              duration: const Duration(seconds: 2),
             ),
-          ),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Medications: ${patient['medications']}'),
-                Text('Side Effects Reported: ${patient['sideEffects']}'),
-                Text('Herbal Medicines: ${patient['herbalUses']}'),
-                Builder(
-                  builder: (context) {
-                    final doctorId = patient['doctorId'] as String?;
-                    final clinician = doctorId != null ? authProvider.getClinicianById(doctorId) : null;
-                    final doctorName = clinician?.name ?? 'Unknown Doctor';
-                    return Text('Doctor: $doctorName');
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

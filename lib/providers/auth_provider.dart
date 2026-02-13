@@ -23,9 +23,15 @@ class AuthProvider with ChangeNotifier {
   // Initialize auth state listener
   void initAuthStateListener() {
     _authService.authStateChanges.listen((firebaseUser) async {
+      debugPrint('AuthProvider.authStateListener - Firebase user changed: ${firebaseUser?.uid}');
       if (firebaseUser != null) {
-        _currentUser = await _firestoreService.getUser(firebaseUser.uid);
-        notifyListeners();
+        final user = await _firestoreService.getUser(firebaseUser.uid);
+        debugPrint('AuthProvider.authStateListener - Fetched user from Firestore: ${user?.name}');
+        // Only update if we don't already have the user loaded
+        if (_currentUser == null || _currentUser!.id != firebaseUser.uid) {
+          _currentUser = user;
+          notifyListeners();
+        }
       } else {
         _currentUser = null;
         notifyListeners();
@@ -72,8 +78,11 @@ class AuthProvider with ChangeNotifier {
         defaultRole: role, // Pass the expected role for auto-creation
       );
 
+      debugPrint('AuthProvider.login - User logged in: ${_currentUser?.name}, Email: ${_currentUser?.email}');
+
       // If role doesn't match, update it in Firestore
       if (_currentUser!.role != role) {
+        debugPrint('AuthProvider.login - Role mismatch, updating role from ${_currentUser!.role} to $role');
         _currentUser = User(
           id: _currentUser!.id,
           name: _currentUser!.name,
@@ -89,6 +98,7 @@ class AuthProvider with ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+      debugPrint('AuthProvider.login - Final currentUser name: ${_currentUser?.name}');
     } catch (e) {
       _isLoading = false;
       notifyListeners();

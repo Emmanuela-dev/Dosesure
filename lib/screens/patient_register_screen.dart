@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
-import 'patient_home_screen.dart';
+import 'patient_login_screen.dart';
 
 class PatientRegisterScreen extends StatefulWidget {
   const PatientRegisterScreen({super.key});
@@ -19,19 +19,31 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   String? _selectedDoctorId;
   bool _isLoading = false;
+  bool _isLoadingDoctors = true;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
   @override
   void initState() {
     super.initState();
-    // Load clinicians when screen opens to avoid delay during registration
+    // Always load clinicians from database when screen opens to get fresh data
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.clinicians.isEmpty) {
-        authProvider.loadClinicians();
-      }
+      _loadDoctors();
     });
+  }
+
+  Future<void> _loadDoctors() async {
+    setState(() => _isLoadingDoctors = true);
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.loadClinicians();
+    } catch (e) {
+      debugPrint('Error loading doctors: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingDoctors = false);
+      }
+    }
   }
 
   @override
@@ -64,9 +76,18 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
         doctorName: doctorName,
       );
 
+      // Sign out after registration so user can log in
+      await authProvider.logout();
+
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully! Please log in.'),
+            backgroundColor: Colors.green,
+          ),
+        );
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const PatientHomeScreen()),
+          MaterialPageRoute(builder: (_) => const PatientLoginScreen()),
         );
       }
     } catch (e) {
@@ -163,34 +184,87 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                 const SizedBox(height: 16),
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
-                    return DropdownButtonFormField<String>(
-                      value: _selectedDoctorId,
-                      decoration: const InputDecoration(
-                        labelText: 'Select Your Doctor (Optional)',
-                        prefixIcon: Icon(Icons.medical_services),
-                        hintText: 'Choose your doctor from the list',
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('No doctor selected'),
+                    if (_isLoadingDoctors) {
+                      return const InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Select Your Doctor (Optional)',
+                          prefixIcon: Icon(Icons.medical_services),
                         ),
-                        ...authProvider.clinicians.map((clinician) {
-                          return DropdownMenuItem<String>(
-                            value: clinician.id,
-                            child: Text(clinician.name),
-                          );
-                        }).toList(),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 12),
+                            Text('Loading doctors...'),
+                          ],
+                        ),
+                      );
+                    }
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: 'Select Your Doctor (Optional)',
+                            prefixIcon: const Icon(Icons.medical_services),
+                            hintText: authProvider.clinicians.isEmpty 
+                                ? 'No doctors available yet' 
+                                : 'Choose your doctor from the list',
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.refresh),
+                              onPressed: _loadDoctors,
+                              tooltip: 'Refresh doctor list',
+                            ),
+                          ),
+                          value: _selectedDoctorId,
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('No doctor selected'),
+                            ),
+                            ...authProvider.clinicians.map((clinician) {
+                              return DropdownMenuItem<String>(
+                                value: clinician.id,
+                                child: Text(clinician.name),
+                              );
+                            }),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedDoctorId = value;
+                            });
+                          },
+                          validator: (value) {
+                            // Optional field, no validation required
+                            return null;
+                          },
+                        ),
+                        if (authProvider.clinicians.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              'No doctors registered yet. You can skip this and update later.',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        if (authProvider.clinicians.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              '${authProvider.clinicians.length} doctor(s) available',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
                       ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedDoctorId = value;
-                        });
-                      },
-                      validator: (value) {
-                        // Optional field, no validation required
-                        return null;
-                      },
                     );
                   },
                 ),

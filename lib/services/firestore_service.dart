@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/medication.dart';
 import '../models/dose_log.dart';
@@ -25,8 +26,15 @@ class FirestoreService {
   // Get user by ID
   Future<User?> getUser(String userId) async {
     final doc = await _usersCollection.doc(userId).get();
-    if (!doc.exists) return null;
-    return User.fromJson(doc.data() as Map<String, dynamic>);
+    if (!doc.exists) {
+      debugPrint('FirestoreService.getUser - Document does not exist for userId: $userId');
+      return null;
+    }
+    final data = doc.data() as Map<String, dynamic>;
+    // Ensure the id is set from the document ID
+    data['id'] = doc.id;
+    debugPrint('FirestoreService.getUser - Raw data: $data');
+    return User.fromJson(data);
   }
 
   // Update user
@@ -44,9 +52,11 @@ class FirestoreService {
     final snapshot = await _usersCollection
         .where('role', isEqualTo: UserRole.clinician.index)
         .get();
-    return snapshot.docs
-        .map((doc) => User.fromJson(doc.data() as Map<String, dynamic>))
-        .toList();
+    return snapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return User.fromJson(data);
+    }).toList();
   }
 
   // Get patients for a clinician
@@ -55,9 +65,11 @@ class FirestoreService {
         .where('role', isEqualTo: UserRole.patient.index)
         .where('doctorId', isEqualTo: clinicianId)
         .get();
-    return snapshot.docs
-        .map((doc) => User.fromJson(doc.data() as Map<String, dynamic>))
-        .toList();
+    return snapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return User.fromJson(data);
+    }).toList();
   }
 
   // ==================== MEDICATION METHODS ====================
