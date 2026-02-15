@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/firestore_service.dart';
 import '../models/user.dart';
+import 'prescribe_medication_screen.dart';
+import 'patient_medications_view_screen.dart';
+import 'patient_details_screen.dart';
 
 class ClinicianPatientsScreen extends StatefulWidget {
   const ClinicianPatientsScreen({super.key});
@@ -139,20 +142,38 @@ class _ClinicianPatientsScreenState extends State<ClinicianPatientsScreen> {
         ),
         title: Text(patient.name),
         subtitle: Text(patient.email),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Text(
-            'Patient',
-            style: TextStyle(
-              color: Colors.blue,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Patient',
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.info_outline, color: Colors.blue),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PatientDetailsScreen(patient: patient),
+                  ),
+                );
+              },
+              tooltip: 'View Details',
+            ),
+          ],
         ),
         children: [
           Padding(
@@ -168,13 +189,43 @@ class _ClinicianPatientsScreenState extends State<ClinicianPatientsScreen> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          // TODO: Navigate to patient details/health data
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Viewing ${patient.name}\'s health data')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PatientMedicationsViewScreen(patient: patient),
+                            ),
                           );
                         },
                         icon: const Icon(Icons.visibility, size: 18),
-                        label: const Text('View Health Data'),
+                        label: const Text('View Medications'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PrescribeMedicationScreen(patient: patient),
+                            ),
+                          ).then((result) {
+                            if (result == true) {
+                              // Refresh if medication was added
+                              _loadPatients();
+                            }
+                          });
+                        },
+                        icon: const Icon(Icons.medication, size: 18),
+                        label: const Text('Prescribe Medication'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ),
                   ],

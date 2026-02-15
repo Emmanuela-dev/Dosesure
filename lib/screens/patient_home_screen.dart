@@ -19,27 +19,6 @@ class PatientHomeScreen extends StatefulWidget {
 }
 
 class _PatientHomeScreenState extends State<PatientHomeScreen> {
-  final List<Map<String, dynamic>> _todayMedications = [
-    {
-      'name': 'Aspirin',
-      'dosage': '100mg',
-      'time': '08:00',
-      'taken': false,
-    },
-    {
-      'name': 'Metformin',
-      'dosage': '500mg',
-      'time': '12:00',
-      'taken': true,
-    },
-    {
-      'name': 'Lisinopril',
-      'dosage': '10mg',
-      'time': '18:00',
-      'taken': false,
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
     final today = DateFormat('EEEE, MMMM d').format(DateTime.now());
@@ -89,7 +68,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              ..._todayMedications.map((med) => _buildMedicationCard(med)),
+              _buildMedicationsFromProvider(),
               const SizedBox(height: 32),
               _buildHealthSummary(),
               const SizedBox(height: 32),
@@ -133,6 +112,129 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
               break;
           }
         },
+      ),
+    );
+  }
+
+  Widget _buildMedicationsFromProvider() {
+    return Consumer<HealthDataProvider>(
+      builder: (context, healthData, child) {
+        final medications = healthData.medications.where((m) => m.isActive).toList();
+        
+        if (medications.isEmpty) {
+          return Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.medication_outlined,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No medications prescribed yet',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your doctor will prescribe medications for you',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        return Column(
+          children: medications.map((med) => _buildMedicationCardFromModel(med)).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildMedicationCardFromModel(Medication med) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.medication,
+                    color: Theme.of(context).primaryColor,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        med.name,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${med.dosage} - ${med.frequency}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(
+                  'Times: ${med.times.join(', ')}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+            if (med.prescribedByName != null && med.prescribedByName!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.person, size: 16, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Prescribed by: Dr. ${med.prescribedByName}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -212,54 +314,6 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMedicationCard(Map<String, dynamic> med) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Icon(
-              Icons.medication,
-              color: Theme.of(context).primaryColor,
-              size: 40,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    med['name'],
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    '${med['dosage']} at ${med['time']}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
-            Checkbox(
-              value: med['taken'],
-              onChanged: (value) {
-                setState(() {
-                  med['taken'] = value ?? false;
-                });
-              },
-            ),
-          ],
         ),
       ),
     );

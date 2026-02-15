@@ -8,6 +8,9 @@ class Medication {
   final DateTime startDate;
   final DateTime? endDate;
   final bool isActive;
+  final String? prescribedBy; // Doctor/Clinician ID who prescribed this medication
+  final String? prescribedByName; // Doctor/Clinician name for display
+  final String? patientId; // Patient ID this medication is for
 
   Medication({
     required this.id,
@@ -19,6 +22,9 @@ class Medication {
     required this.startDate,
     this.endDate,
     this.isActive = true,
+    this.prescribedBy,
+    this.prescribedByName,
+    this.patientId,
   });
 
   factory Medication.fromJson(Map<String, dynamic> json) {
@@ -32,6 +38,9 @@ class Medication {
       startDate: DateTime.parse(json['startDate']),
       endDate: json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
       isActive: json['isActive'] ?? true,
+      prescribedBy: json['prescribedBy'],
+      prescribedByName: json['prescribedByName'],
+      patientId: json['patientId'],
     );
   }
 
@@ -46,6 +55,9 @@ class Medication {
       'startDate': startDate.toIso8601String(),
       'endDate': endDate?.toIso8601String(),
       'isActive': isActive,
+      'prescribedBy': prescribedBy,
+      'prescribedByName': prescribedByName,
+      'patientId': patientId,
     };
   }
 }

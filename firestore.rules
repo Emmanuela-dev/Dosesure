@@ -19,7 +19,7 @@ service cloud.firestore {
     
     // Helper function to check if user is a clinician
     function isClinician() {
-      return isAuthenticated() && getUserData(request.auth.uid).role == 0;
+      return isAuthenticated() && getUserData(request.auth.uid).role == 1;
     }
     
     // Helper function to check if clinician can access patient data
@@ -27,70 +27,51 @@ service cloud.firestore {
       return isClinician() && getUserData(patientId).doctorId == request.auth.uid;
     }
     
-    // User documents
+    // User documents - ALLOW READ FOR DOCTOR DROPDOWN DURING REGISTRATION
     match /users/{userId} {
-      // Allow authenticated users to read and write their own profile
-      allow read, write: if isOwner(userId);
+      // Allow anyone to read users (needed for doctor selection during patient registration)
+      allow read: if true;
+      
+      // Allow authenticated users to write their own profile
+      allow write: if isOwner(userId);
       
       // Allow user creation during registration (when auth uid matches document id)
       allow create: if request.auth.uid == userId;
       
-      // Clinicians can read their patients' profiles
-      allow read: if isAuthenticated() && canAccessPatientData(userId);
-      
-      // Allow anyone to read clinician profiles (for patient registration dropdown)
-      // This is safe because clinicians are public healthcare providers
-      allow read: if resource.data.role == 0;
-      
-      // Allow listing users for clinician lookup (limited to clinicians only)
+      // Allow listing users (for clinician lookup)
       allow list: if true;
+    }
+    
+    // Drugs collection - available to everyone for reading
+    match /drugs/{drugId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
     
     // Medication documents
     match /medications/{medicationId} {
-      // Users can access their own medications
-      allow read, write: if isOwner(resource.data.userId);
-      
-      // Clinicians can access their patients' medications
-      allow read: if canAccessPatientData(resource.data.userId);
-      
-      // Allow creation with proper userId
-      allow create: if isOwner(request.resource.data.userId);
+      allow read, write: if isAuthenticated();
+      allow create: if isAuthenticated();
     }
     
     // Dose log documents
     match /doseLogs/{doseLogId} {
-      // Users can access their own dose logs
       allow read, write: if isOwner(resource.data.userId);
-      
-      // Clinicians can access their patients' dose logs
       allow read: if canAccessPatientData(resource.data.userId);
-      
-      // Allow creation with proper userId
       allow create: if isOwner(request.resource.data.userId);
     }
     
     // Side effect documents
     match /sideEffects/{sideEffectId} {
-      // Users can access their own side effects
       allow read, write: if isOwner(resource.data.userId);
-      
-      // Clinicians can access their patients' side effects
       allow read: if canAccessPatientData(resource.data.userId);
-      
-      // Allow creation with proper userId
       allow create: if isOwner(request.resource.data.userId);
     }
     
     // Herbal use documents
     match /herbalUses/{herbalUseId} {
-      // Users can access their own herbal uses
       allow read, write: if isOwner(resource.data.userId);
-      
-      // Clinicians can access their patients' herbal uses
       allow read: if canAccessPatientData(resource.data.userId);
-      
-      // Allow creation with proper userId
       allow create: if isOwner(request.resource.data.userId);
     }
   }

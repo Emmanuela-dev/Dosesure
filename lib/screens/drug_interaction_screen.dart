@@ -67,6 +67,14 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
       return 'Analgesic';
     } else if (name.contains('atorvastatin') || name.contains('simvastatin')) {
       return 'Statin';
+    } else if (name.contains('magnesium hydroxide') || 
+               name.contains('calcium carbonate') || 
+               name.contains('sodium bicarbonate') || 
+               name.contains('combination antacid') || 
+               name.contains('aluminium hydroxide') ||
+               name.contains('aluminum hydroxide') ||
+               name.contains('antacid')) {
+      return 'Antacid';
     }
     return 'Other';
   }
@@ -213,6 +221,66 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
       );
     }
 
+    // Multiple antacids interaction - using different types together
+    if (_isAntacid(name1) && _isAntacid(name2)) {
+      // Check if they are different antacids (not the same drug)
+      if (name1 != name2) {
+        return DrugInteraction(
+          id: 'int_${drug1.id}_${drug2.id}',
+          drug1Id: drug1.id,
+          drug2Id: drug2.id,
+          description:
+              'Taking multiple antacids together can lead to excessive neutralization of stomach acid, affecting digestion and absorption of nutrients.',
+          severity: InteractionSeverity.low,
+          symptoms: ['Constipation', 'Diarrhea', 'Bloating', 'Electrolyte imbalance'],
+          recommendation: 'Usually only one antacid is needed. Consult your healthcare provider about which antacid is best for you.',
+        );
+      }
+    }
+
+    // Calcium Carbonate + Magnesium Hydroxide specific interaction
+    if ((name1.contains('calcium carbonate') && name2.contains('magnesium hydroxide')) ||
+        (name1.contains('magnesium hydroxide') && name2.contains('calcium carbonate'))) {
+      return DrugInteraction(
+        id: 'int_${drug1.id}_${drug2.id}',
+        drug1Id: drug1.id,
+        drug2Id: drug2.id,
+        description:
+            'Calcium carbonate may cause constipation while magnesium hydroxide has a laxative effect. The combination can balance these effects but may cause unpredictable GI symptoms.',
+        severity: InteractionSeverity.low,
+        symptoms: ['Alternating constipation and diarrhea', 'Bloating', 'Gas'],
+        recommendation: 'Monitor GI symptoms. This combination is generally safe but may cause variable stool consistency.',
+      );
+    }
+
+    // Aluminium Hydroxide + other medications (general slow absorption)
+    if ((name1.contains('aluminium hydroxide') || name1.contains('aluminum hydroxide')) && 
+        !_isAntacid(name2)) {
+      return DrugInteraction(
+        id: 'int_${drug1.id}_${drug2.id}',
+        drug1Id: drug1.id,
+        drug2Id: drug2.id,
+        description:
+            'Aluminium hydroxide can reduce the absorption of many medications by binding to them in the gut.',
+        severity: InteractionSeverity.moderate,
+        symptoms: ['Reduced medication effectiveness'],
+        recommendation: 'Take other medications 2 hours before or after aluminium hydroxide.',
+      );
+    }
+    if ((name2.contains('aluminium hydroxide') || name2.contains('aluminum hydroxide')) && 
+        !_isAntacid(name1)) {
+      return DrugInteraction(
+        id: 'int_${drug1.id}_${drug2.id}',
+        drug1Id: drug1.id,
+        drug2Id: drug2.id,
+        description:
+            'Aluminium hydroxide can reduce the absorption of many medications by binding to them in the gut.',
+        severity: InteractionSeverity.moderate,
+        symptoms: ['Reduced medication effectiveness'],
+        recommendation: 'Take other medications 2 hours before or after aluminium hydroxide.',
+      );
+    }
+
     return null;
   }
 
@@ -227,7 +295,14 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
         name.contains('pantoprazole') ||
         name.contains('lansoprazole') ||
         name.contains('antacid') ||
-        name.contains('gaviscon');
+        name.contains('gaviscon') ||
+        // The 5 antacids from the database
+        name.contains('magnesium hydroxide') ||
+        name.contains('calcium carbonate') ||
+        name.contains('sodium bicarbonate') ||
+        name.contains('combination antacid') ||
+        name.contains('aluminium hydroxide') ||
+        name.contains('aluminum hydroxide'); // Alternative spelling
   }
 
   bool _isAntibiotic(String drugName) {

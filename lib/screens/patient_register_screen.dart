@@ -37,8 +37,23 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.loadClinicians();
+      debugPrint('PatientRegisterScreen - Loaded ${authProvider.clinicians.length} clinicians');
     } catch (e) {
-      debugPrint('Error loading doctors: $e');
+      debugPrint('PatientRegisterScreen - Error loading doctors: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not load doctors: ${e.toString().split('\n').first}'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _loadDoctors,
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoadingDoctors = false);

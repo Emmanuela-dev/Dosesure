@@ -3,7 +3,19 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Temporary relaxed rules for testing - REPLACE WITH SECURE RULES IN PRODUCTION
     
-    // Allow authenticated users to read/write everything for now
+    // Allow everyone to read users (for doctor list during registration)
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Allow everyone to read drugs (needed for prescription dropdown)
+    match /drugs/{drugId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read/write everything else
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

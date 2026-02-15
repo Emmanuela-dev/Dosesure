@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
 import '../models/medication.dart';
-import 'add_medication_screen.dart';
 
 class MedicationListScreen extends StatelessWidget {
   const MedicationListScreen({super.key});
@@ -12,17 +11,6 @@ class MedicationListScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Medications'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AddMedicationScreen()),
-              );
-            },
-          ),
-        ],
       ),
       body: Consumer<HealthDataProvider>(
         builder: (context, healthData, child) {
@@ -40,12 +28,12 @@ class MedicationListScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No medications added yet',
+                    'No medications prescribed yet',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tap the + button to add your first medication',
+                    'Your doctor will prescribe medications\nfor you when needed',
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
@@ -81,10 +69,21 @@ class MedicationListScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.medication,
-                  color: Theme.of(context).primaryColor,
-                  size: 32,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: medication.isActive 
+                        ? Theme.of(context).primaryColor.withOpacity(0.1)
+                        : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.medication,
+                    color: medication.isActive 
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey,
+                    size: 32,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -104,50 +103,68 @@ class MedicationListScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                Switch(
-                  value: medication.isActive,
-                  onChanged: (value) {
-                    // TODO: Update medication active status
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Times: ${medication.times.join(', ')}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (medication.instructions.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Instructions: ${medication.instructions}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    // TODO: Navigate to edit screen
-                  },
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Edit'),
-                ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: () {
-                    // TODO: Show delete confirmation
-                  },
-                  icon: const Icon(Icons.delete, size: 16),
-                  label: const Text('Delete'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: medication.isActive 
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    medication.isActive ? 'Active' : 'Inactive',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: medication.isActive ? Colors.green : Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
+            const Divider(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(
+                  'Times: ${medication.times.join(', ')}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+            if (medication.instructions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      medication.instructions,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (medication.prescribedByName != null && medication.prescribedByName!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.person, size: 16, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Prescribed by: Dr. ${medication.prescribedByName}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

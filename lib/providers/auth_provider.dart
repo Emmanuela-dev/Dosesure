@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+import '../models/drug.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/firestore_service.dart';
 
@@ -10,6 +11,7 @@ class AuthProvider with ChangeNotifier {
   
   User? _currentUser;
   List<User> _clinicians = [];
+  List<Drug> _drugs = [];
   bool _isLoading = false;
 
   User? get currentUser => _currentUser;
@@ -19,6 +21,8 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
 
   List<User> get clinicians => _clinicians;
+
+  List<Drug> get drugs => _drugs;
 
   // Initialize auth state listener
   void initAuthStateListener() {
@@ -42,10 +46,13 @@ class AuthProvider with ChangeNotifier {
   // Load clinicians from Firestore
   Future<void> loadClinicians() async {
     try {
+      debugPrint('AuthProvider.loadClinicians - Loading clinicians...');
       _clinicians = await _firestoreService.getClinicians();
+      debugPrint('AuthProvider.loadClinicians - Loaded ${_clinicians.length} clinicians');
       notifyListeners();
     } catch (e) {
-      debugPrint('Error loading clinicians: $e');
+      debugPrint('AuthProvider.loadClinicians - Error: $e');
+      rethrow;
     }
   }
 
@@ -64,6 +71,35 @@ class AuthProvider with ChangeNotifier {
       return _clinicians.firstWhere((clinician) => clinician.name == name);
     } catch (e) {
       return null;
+    }
+  }
+
+  // Load drugs from Firestore
+  Future<void> loadDrugs() async {
+    try {
+      debugPrint('AuthProvider.loadDrugs - Loading drugs from Firestore...');
+      _drugs = await _firestoreService.getAllDrugs();
+      debugPrint('AuthProvider.loadDrugs - Loaded ${_drugs.length} drugs');
+      for (final drug in _drugs) {
+        debugPrint('AuthProvider.loadDrugs - Drug: ${drug.name} (${drug.category})');
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('AuthProvider.loadDrugs - Error: $e');
+      rethrow;
+    }
+  }
+
+  // Initialize default drugs (call on app start)
+  Future<void> initializeDefaultDrugs() async {
+    try {
+      debugPrint('AuthProvider.initializeDefaultDrugs - Starting initialization...');
+      await _firestoreService.initializeDefaultDrugs();
+      // Reload drugs after initialization
+      await loadDrugs();
+      debugPrint('AuthProvider.initializeDefaultDrugs - Complete');
+    } catch (e) {
+      debugPrint('AuthProvider.initializeDefaultDrugs - Error: $e');
     }
   }
 

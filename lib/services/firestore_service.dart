@@ -5,6 +5,7 @@ import '../models/medication.dart';
 import '../models/dose_log.dart';
 import '../models/side_effect.dart';
 import '../models/herbal_use.dart';
+import '../models/drug.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -15,6 +16,7 @@ class FirestoreService {
   CollectionReference get _doseLogsCollection => _firestore.collection('doseLogs');
   CollectionReference get _sideEffectsCollection => _firestore.collection('sideEffects');
   CollectionReference get _herbalUsesCollection => _firestore.collection('herbalUses');
+  CollectionReference get _drugsCollection => _firestore.collection('drugs');
 
   // ==================== USER METHODS ====================
 
@@ -49,14 +51,50 @@ class FirestoreService {
 
   // Get all clinicians
   Future<List<User>> getClinicians() async {
-    final snapshot = await _usersCollection
-        .where('role', isEqualTo: UserRole.clinician.index)
-        .get();
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = doc.id;
-      return User.fromJson(data);
-    }).toList();
+    try {
+      debugPrint('FirestoreService.getClinicians - Fetching clinicians...');
+      debugPrint('FirestoreService.getClinicians - UserRole.clinician.index = ${UserRole.clinician.index}');
+      
+      // Try to get clinicians with role = 1 (clinician enum index)
+      var snapshot = await _usersCollection
+          .where('role', isEqualTo: 1)
+          .get();
+      
+      debugPrint('FirestoreService.getClinicians - Found ${snapshot.docs.length} clinicians with role=1');
+      
+      // If no clinicians found, also try role = 0 (in case the enum was reversed in the database)
+      if (snapshot.docs.isEmpty) {
+        debugPrint('FirestoreService.getClinicians - No clinicians with role=1, trying role=0...');
+        snapshot = await _usersCollection
+            .where('role', isEqualTo: 0)
+            .get();
+        debugPrint('FirestoreService.getClinicians - Found ${snapshot.docs.length} users with role=0');
+        
+        // If still empty, try fetching all users and filtering
+        if (snapshot.docs.isEmpty) {
+          debugPrint('FirestoreService.getClinicians - No users found with role filter, fetching all users...');
+          final allUsersSnapshot = await _usersCollection.get();
+          debugPrint('FirestoreService.getClinicians - Total users in database: ${allUsersSnapshot.docs.length}');
+          
+          for (var doc in allUsersSnapshot.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            debugPrint('FirestoreService.getClinicians - User: ${data['name']}, role: ${data['role']}, email: ${data['email']}');
+          }
+        }
+      }
+      
+      final clinicians = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        debugPrint('FirestoreService.getClinicians - Clinician: ${data['name']} (${data['email']}) role: ${data['role']}');
+        return User.fromJson(data);
+      }).toList();
+      
+      return clinicians;
+    } catch (e) {
+      debugPrint('FirestoreService.getClinicians - Error: $e');
+      rethrow;
+    }
   }
 
   // Get patients for a clinician
@@ -111,6 +149,21 @@ class FirestoreService {
                   'id': doc.id,
                 }))
             .toList());
+  }
+
+  // Get medications for a patient (Future-based, for clinician view)
+  Future<List<Medication>> getMedicationsForPatient(String patientId) async {
+    final snapshot = await _medicationsCollection
+        .where('userId', isEqualTo: patientId)
+        .orderBy('createdAt', descending: true)
+        .get();
+    
+    return snapshot.docs
+        .map((doc) => Medication.fromJson({
+              ...doc.data() as Map<String, dynamic>,
+              'id': doc.id,
+            }))
+        .toList();
   }
 
   // Update medication
@@ -302,5 +355,99 @@ class FirestoreService {
         .where('isActive', isEqualTo: true)
         .get();
     return snapshot.docs.length;
+  }
+
+  // ==================== DRUG METHODS ====================
+
+  // Get all drugs
+  Future<List<Drug>> getAllDrugs() async {
+    final snapshot = await _drugsCollection.orderBy('name').get();
+    return snapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return Drug.fromJson(data);
+    }).toList();
+  }
+
+  // Get drugs by category
+  Future<List<Drug>> getDrugsByCategory(String category) async {
+    final snapshot = await _drugsCollection
+        .where('category', isEqualTo: category)
+        .orderBy('name')
+        .get();
+    return snapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = doc.id;
+      return Drug.fromJson(data);
+    }).toList();
+  }
+
+  // Initialize default drugs (call this once on first app start)
+  Future<void> initializeDefaultDrugs() async {
+    try {
+      debugPrint('FirestoreService.initializeDefaultDrugs - Checking if drugs exist...');
+      
+      // Default antacid drugs
+      final defaultDrugs = [
+        Drug(
+          id: 'magnesium_hydroxide',
+          name: 'Magnesium Hydroxide',
+          category: 'Antacid',
+          description: 'Used for relief of heartburn, sour stomach, and indigestion',
+        ),
+        Drug(
+          id: 'calcium_carbonate',
+          name: 'Calcium Carbonate',
+          category: 'Antacid',
+          description: 'Used as an antacid for heartburn and as a calcium supplement',
+        ),
+        Drug(
+          id: 'sodium_bicarbonate',
+          name: 'Sodium Bicarbonate',
+          category: 'Antacid',
+          description: 'Used for relief of heartburn, indigestion, and sour stomach',
+        ),
+        Drug(
+          id: 'combination_antacid',
+          name: 'Combination Antacid',
+          category: 'Antacid',
+          description: 'Combination of multiple antacids for enhanced relief',
+        ),
+        Drug(
+          id: 'aluminium_hydroxide',
+          name: 'Aluminium Hydroxide',
+          category: 'Antacid',
+          description: 'Used to treat heartburn, peptic ulcers, and hyperphosphatemia',
+        ),
+      ];
+
+      // Try to check if drugs exist, but don't fail if we can't check
+      bool drugsExist = false;
+      try {
+        final snapshot = await _drugsCollection.limit(1).get();
+        drugsExist = snapshot.docs.isNotEmpty;
+        debugPrint('FirestoreService.initializeDefaultDrugs - Existing drugs check: $drugsExist (${snapshot.docs.length} found)');
+      } catch (e) {
+        debugPrint('FirestoreService.initializeDefaultDrugs - Could not check existing drugs: $e');
+        // Continue anyway - we'll try to create them
+      }
+      
+      if (drugsExist) {
+        debugPrint('FirestoreService.initializeDefaultDrugs - Drugs already exist, skipping');
+        return;
+      }
+
+      debugPrint('FirestoreService.initializeDefaultDrugs - Creating ${defaultDrugs.length} drugs...');
+      
+      // Add all drugs to Firestore
+      for (final drug in defaultDrugs) {
+        try {
+          await _drugsCollection.doc(drug.id).set(drug.toJson());
+          debugPrint('FirestoreService.initializeDefaultDrugs - Added drug: ${drug.name}');
+        } catch (e) {
+          debugPrint('FirestoreService.initializeDefaultDrugs - Failed to add ${drug.name}: $e');
+        }
+      }
+      debugPrint('FirestoreService.initializeDefaultDrugs - Complete');
   }
 }

@@ -7,6 +7,7 @@ import 'providers/health_data_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
 import 'services/notification_service.dart';
+import 'services/firestore_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,7 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    debugPrint('Firebase initialized successfully');
   } catch (e) {
     debugPrint('Firebase initialization error: $e');
     // App will still run but Firebase features won't work
@@ -27,6 +29,16 @@ void main() async {
     await NotificationService().initialize();
   } catch (e) {
     debugPrint('Notification service initialization error: $e');
+  }
+  
+  // Initialize default drugs directly using FirestoreService
+  try {
+    debugPrint('Initializing default drugs...');
+    final firestoreService = FirestoreService();
+    await firestoreService.initializeDefaultDrugs();
+    debugPrint('Default drugs initialization complete');
+  } catch (e) {
+    debugPrint('Error initializing default drugs: $e');
   }
   
   runApp(const MyApp());
