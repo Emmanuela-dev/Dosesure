@@ -22,7 +22,7 @@ class NotificationService {
     tz_data.initializeTimeZones();
 
     // Android initialization settings
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings('@mipmap/logo');
 
     // iOS initialization settings
     const iosSettings = DarwinInitializationSettings(
@@ -142,8 +142,8 @@ class NotificationService {
       priority: Priority.high,
       enableVibration: true,
       playSound: true,
-      icon: '@mipmap/ic_launcher',
-      largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+      icon: '@mipmap/logo',
+      largeIcon: DrawableResourceAndroidBitmap('@mipmap/logo'),
     );
 
     const iosDetails = DarwinNotificationDetails(

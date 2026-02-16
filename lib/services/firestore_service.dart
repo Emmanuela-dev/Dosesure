@@ -99,15 +99,69 @@ class FirestoreService {
 
   // Get patients for a clinician
   Future<List<User>> getPatientsForClinician(String clinicianId) async {
-    final snapshot = await _usersCollection
-        .where('role', isEqualTo: UserRole.patient.index)
-        .where('doctorId', isEqualTo: clinicianId)
-        .get();
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = doc.id;
-      return User.fromJson(data);
-    }).toList();
+    try {
+      debugPrint('getPatientsForClinician - Fetching patients for clinician: $clinicianId');
+      debugPrint('getPatientsForClinician - UserRole.patient.index = ${UserRole.patient.index}');
+      
+      // Try the compound query first
+      final snapshot = await _usersCollection
+          .where('role', isEqualTo: UserRole.patient.index)
+          .where('doctorId', isEqualTo: clinicianId)
+          .get();
+      
+      debugPrint('getPatientsForClinician - Found ${snapshot.docs.length} patients with compound query');
+      
+      final patients = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        debugPrint('getPatientsForClinician - Patient: ${data['name']} (${data['email']}) doctorId: ${data['doctorId']}');
+        return User.fromJson(data);
+      }).toList();
+      
+      return patients;
+    } catch (e) {
+      // If compound query fails (likely index issue), fall back to simpler query
+      debugPrint('getPatientsForClinician - Compound query failed, trying fallback: $e');
+      try {
+        final snapshot = await _usersCollection
+            .where('doctorId', isEqualTo: clinicianId)
+            .get();
+        
+        debugPrint('getPatientsForClinician - Fallback found ${snapshot.docs.length} users with doctorId');
+        
+        final patients = snapshot.docs
+            .map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              data['id'] = doc.id;
+              debugPrint('getPatientsForClinician - User: ${data['name']} role: ${data['role']}');
+              return User.fromJson(data);
+            })
+            .where((user) => user.role == UserRole.patient)
+            .toList();
+        
+        debugPrint('getPatientsForClinician - Filtered to ${patients.length} patients');
+        return patients;
+      } catch (e2) {
+        debugPrint('getPatientsForClinician - Fallback query also failed: $e2');
+        
+        // Last resort: get all users and filter
+        debugPrint('getPatientsForClinician - Trying to fetch all users...');
+        final allSnapshot = await _usersCollection.get();
+        debugPrint('getPatientsForClinician - Total users: ${allSnapshot.docs.length}');
+        
+        final patients = allSnapshot.docs
+            .map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              data['id'] = doc.id;
+              return User.fromJson(data);
+            })
+            .where((user) => user.role == UserRole.patient && user.doctorId == clinicianId)
+            .toList();
+        
+        debugPrint('getPatientsForClinician - Final filtered patients: ${patients.length}');
+        return patients;
+      }
+    }
   }
 
   // ==================== MEDICATION METHODS ====================
@@ -153,17 +207,36 @@ class FirestoreService {
 
   // Get medications for a patient (Future-based, for clinician view)
   Future<List<Medication>> getMedicationsForPatient(String patientId) async {
-    final snapshot = await _medicationsCollection
-        .where('userId', isEqualTo: patientId)
-        .orderBy('createdAt', descending: true)
-        .get();
-    
-    return snapshot.docs
-        .map((doc) => Medication.fromJson({
-              ...doc.data() as Map<String, dynamic>,
-              'id': doc.id,
-            }))
-        .toList();
+    try {
+      final snapshot = await _medicationsCollection
+          .where('userId', isEqualTo: patientId)
+          .orderBy('createdAt', descending: true)
+          .get();
+      
+      return snapshot.docs
+          .map((doc) => Medication.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id,
+              }))
+          .toList();
+    } catch (e) {
+      debugPrint('getMedicationsForPatient - Index query failed, trying fallback: $e');
+      // Fallback: get without orderBy and sort client-side
+      final snapshot = await _medicationsCollection
+          .where('userId', isEqualTo: patientId)
+          .get();
+      
+      final medications = snapshot.docs
+          .map((doc) => Medication.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id,
+              }))
+          .toList();
+      
+      // Sort by startDate descending (since createdAt may not be in the medication object)
+      medications.sort((a, b) => b.startDate.compareTo(a.startDate));
+      return medications;
+    }
   }
 
   // Update medication
@@ -449,5 +522,8 @@ class FirestoreService {
         }
       }
       debugPrint('FirestoreService.initializeDefaultDrugs - Complete');
+    } catch (e) {
+      debugPrint('FirestoreService.initializeDefaultDrugs - Error: $e');
+    }
   }
 }

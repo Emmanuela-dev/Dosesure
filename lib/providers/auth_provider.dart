@@ -192,6 +192,11 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // Alias for logout
+  Future<void> signOut() async {
+    await logout();
+  }
+
   Future<void> loadUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();

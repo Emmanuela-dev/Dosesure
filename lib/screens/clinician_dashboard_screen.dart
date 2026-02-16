@@ -7,6 +7,7 @@ import '../models/user.dart';
 import 'clinician_patients_screen.dart';
 import 'clinician_reports_screen.dart';
 import 'drug_interaction_screen.dart';
+import 'patient_details_screen.dart';
 import '../models/drug_interaction.dart';
 import '../widgets/drug_interaction_graph.dart';
 import '../models/medication.dart';
@@ -43,14 +44,53 @@ class _ClinicianDashboardScreenState extends State<ClinicianDashboardScreen> {
           IconButton(
             icon: const Icon(Icons.notifications),
             onPressed: () {
-              // TODO: Navigate to alerts
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No new notifications')),
+              );
             },
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.person),
-            onPressed: () {
-              // TODO: Navigate to profile
+            onSelected: (value) async {
+              if (value == 'logout') {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Sign Out'),
+                    content: const Text('Are you sure you want to sign out?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        child: const Text('Sign Out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  await Provider.of<AuthProvider>(context, listen: false).signOut();
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacementNamed('/login');
+                  }
+                }
+              }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Sign Out'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -273,168 +313,156 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   Widget _buildDrugInteractionPreview(BuildContext context) {
-    return Consumer<HealthDataProvider>(
-      builder: (context, healthData, child) {
-        var medications = healthData.medications.where((m) => m.isActive).toList();
+    // Always show sample antacid medications for demo
+    final medications = [
+      Medication(
+        id: '1',
+        name: 'Aluminium Hydroxide',
+        dosage: '400mg',
+        frequency: 'Three times daily',
+        times: ['08:00', '14:00', '20:00'],
+        instructions: 'Take after meals',
+        startDate: DateTime.now().subtract(const Duration(days: 30)),
+      ),
+      Medication(
+        id: '2',
+        name: 'Calcium Carbonate',
+        dosage: '500mg',
+        frequency: 'As needed',
+        times: ['12:00'],
+        instructions: 'Take for heartburn relief',
+        startDate: DateTime.now().subtract(const Duration(days: 25)),
+      ),
+      Medication(
+        id: '3',
+        name: 'Magnesium Hydroxide',
+        dosage: '400mg',
+        frequency: 'Twice daily',
+        times: ['08:00', '20:00'],
+        instructions: 'Take with water',
+        startDate: DateTime.now().subtract(const Duration(days: 20)),
+      ),
+      Medication(
+        id: '4',
+        name: 'Sodium Bicarbonate',
+        dosage: '650mg',
+        frequency: 'As needed',
+        times: ['12:00'],
+        instructions: 'Dissolve in water before taking',
+        startDate: DateTime.now().subtract(const Duration(days: 15)),
+      ),
+      Medication(
+        id: '5',
+        name: 'Combination Antacid',
+        dosage: '1 tablet',
+        frequency: 'Four times daily',
+        times: ['08:00', '12:00', '18:00', '22:00'],
+        instructions: 'Chew thoroughly before swallowing',
+        startDate: DateTime.now().subtract(const Duration(days: 10)),
+      ),
+    ];
 
-        // Use sample medications if none exist (for demo purposes)
-        if (medications.isEmpty) {
-          medications = [
-            Medication(
-              id: '1',
-              name: 'Aspirin',
-              dosage: '100mg',
-              frequency: 'Once daily',
-              times: ['08:00'],
-              instructions: 'Take with food',
-              startDate: DateTime.now().subtract(const Duration(days: 30)),
-            ),
-            Medication(
-              id: '2',
-              name: 'Lisinopril',
-              dosage: '10mg',
-              frequency: 'Once daily',
-              times: ['08:00'],
-              instructions: 'Take in the morning',
-              startDate: DateTime.now().subtract(const Duration(days: 30)),
-            ),
-            Medication(
-              id: '3',
-              name: 'Metformin',
-              dosage: '500mg',
-              frequency: 'Twice daily',
-              times: ['08:00', '20:00'],
-              instructions: 'Take with meals',
-              startDate: DateTime.now().subtract(const Duration(days: 30)),
-            ),
-            Medication(
-              id: '4',
-              name: 'Tums',
-              dosage: '500mg',
-              frequency: 'As needed',
-              times: ['12:00'],
-              instructions: 'Take after meals for heartburn',
-              startDate: DateTime.now().subtract(const Duration(days: 15)),
-            ),
-            Medication(
-              id: '5',
-              name: 'Ciprofloxacin',
-              dosage: '500mg',
-              frequency: 'Twice daily',
-              times: ['08:00', '20:00'],
-              instructions: 'Complete full course',
-              startDate: DateTime.now().subtract(const Duration(days: 7)),
-            ),
-          ];
+    // Build graph data
+    final nodes = medications.map((med) => DrugNode(
+          id: med.id,
+          name: med.name,
+          category: _getDrugCategory(med.name),
+        )).toList();
+
+    final interactions = <DrugInteraction>[];
+    for (int i = 0; i < medications.length; i++) {
+      for (int j = i + 1; j < medications.length; j++) {
+        final interaction = _checkInteraction(medications[i], medications[j]);
+        if (interaction != null) {
+          interactions.add(interaction);
         }
+      }
+    }
 
-        // Build graph data
-        final nodes = medications.map((med) => DrugNode(
-              id: med.id,
-              name: med.name,
-              category: _getDrugCategory(med.name),
-            )).toList();
+    final graph = DrugInteractionGraph(nodes: nodes, interactions: interactions);
+    final hasHighRisk = interactions.any(
+        (i) => i.severity == InteractionSeverity.high || i.severity == InteractionSeverity.contraindicated);
 
-        final interactions = <DrugInteraction>[];
-        for (int i = 0; i < medications.length; i++) {
-          for (int j = i + 1; j < medications.length; j++) {
-            final interaction = _checkInteraction(medications[i], medications[j]);
-            if (interaction != null) {
-              interactions.add(interaction);
-            }
-          }
-        }
-
-        final graph = DrugInteractionGraph(nodes: nodes, interactions: interactions);
-        final hasHighRisk = interactions.any(
-            (i) => i.severity == InteractionSeverity.high || i.severity == InteractionSeverity.contraindicated);
-
-        return Card(
-          elevation: 4,
-          color: hasHighRisk ? Colors.red.shade50 : null,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Card(
+      elevation: 4,
+      color: hasHighRisk ? Colors.red.shade50 : null,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
+                Icon(
+                  hasHighRisk ? Icons.warning : Icons.medication,
+                  color: hasHighRisk ? Colors.red : Theme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Drug Interactions (Sample Antacids)',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {},
+                  child: const Text('View All'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 200,
+              child: DrugInteractionGraphWidget(
+                graph: graph,
+                primaryColor: Theme.of(context).primaryColor,
+              ),
+            ),
+            if (hasHighRisk) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
                   children: [
-                    Icon(
-                      hasHighRisk ? Icons.warning : Icons.medication,
-                      color: hasHighRisk ? Colors.red : Theme.of(context).primaryColor,
-                    ),
+                    Icon(Icons.priority_high, color: Colors.red.shade700),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Drug Interactions',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        '${interactions.where((i) => i.severity == InteractionSeverity.high || i.severity == InteractionSeverity.contraindicated).length} high-risk interactions detected',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text('View All'),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 200,
-                  child: DrugInteractionGraphWidget(
-                    graph: graph,
-                    primaryColor: Theme.of(context).primaryColor,
-                  ),
-                ),
-                if (hasHighRisk) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.priority_high, color: Colors.red.shade700),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${interactions.where((i) => i.severity == InteractionSeverity.high || i.severity == InteractionSeverity.contraindicated).length} high-risk interactions detected',
-                            style: TextStyle(
-                              color: Colors.red.shade700,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
   String _getDrugCategory(String drugName) {
     final name = drugName.toLowerCase();
-    if (name.contains('aspirin') || name.contains('warfarin') || name.contains('heparin')) {
-      return 'Anticoagulant';
-    } else if (name.contains('metformin') || name.contains('glipizide') || name.contains('insulin')) {
-      return 'Antidiabetic';
-    } else if (name.contains('lisinopril') || name.contains('amlodipine') || name.contains('atenolol')) {
-      return 'Cardiovascular';
-    } else if (name.contains('omeprazole') || name.contains('pantoprazole') || name.contains('tums') || name.contains('maalox')) {
-      return 'Antacid/GI';
-    } else if (name.contains('acetaminophen') || name.contains('ibuprofen')) {
-      return 'Analgesic';
-    } else if (name.contains('atorvastatin') || name.contains('simvastatin')) {
-      return 'Statin';
-    } else if (name.contains('ciprofloxacin') || name.contains('amoxicillin') || name.contains('azithromycin')) {
-      return 'Antibiotic';
+    if (name.contains('aluminium hydroxide')) {
+      return 'Aluminium Hydroxide';
+    } else if (name.contains('magnesium hydroxide')) {
+      return 'Magnesium Hydroxide';
+    } else if (name.contains('calcium carbonate')) {
+      return 'Calcium Carbonate';
+    } else if (name.contains('sodium bicarbonate')) {
+      return 'Sodium Bicarbonate';
+    } else if (name.contains('combination antacid')) {
+      return 'Combination Antacid';
     }
     return 'Other';
   }
@@ -443,73 +471,16 @@ class _DashboardContentState extends State<_DashboardContent> {
     final name1 = drug1.name.toLowerCase();
     final name2 = drug2.name.toLowerCase();
 
-    // Aspirin + Warfarin
-    if ((name1.contains('aspirin') && name2.contains('warfarin')) ||
-        (name1.contains('warfarin') && name2.contains('aspirin'))) {
+    // Antacid + Antacid (example interaction)
+    if (_isAntacid(name1) && _isAntacid(name2) && name1 != name2) {
       return DrugInteraction(
         id: 'int_${drug1.id}_${drug2.id}',
         drug1Id: drug1.id,
         drug2Id: drug2.id,
-        description: 'Increased risk of bleeding. Aspirin enhances the anticoagulant effect of warfarin.',
-        severity: InteractionSeverity.high,
-        symptoms: ['Easy bruising', 'Nosebleeds', 'Black stools', 'Prolonged bleeding'],
-        recommendation: 'Avoid combination unless specifically prescribed by a physician. Monitor INR closely.',
-      );
-    }
-
-    // Lisinopril + Potassium
-    if ((name1.contains('lisinopril') && name2.contains('potassium')) ||
-        (name1.contains('potassium') && name2.contains('lisinopril'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'ACE inhibitors can cause potassium retention, leading to hyperkalemia.',
+        description: 'Concurrent use of multiple antacids may increase the risk of side effects such as constipation or diarrhea.',
         severity: InteractionSeverity.moderate,
-        symptoms: ['Muscle weakness', 'Irregular heartbeat', 'Fatigue'],
-        recommendation: 'Monitor potassium levels regularly. Limit potassium-rich foods.',
-      );
-    }
-
-    // Ibuprofen + Aspirin
-    if ((name1.contains('ibuprofen') && name2.contains('aspirin')) ||
-        (name1.contains('aspirin') && name2.contains('ibuprofen'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'Ibuprofen may reduce the cardioprotective effects of aspirin.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Reduced aspirin effectiveness', 'Increased cardiovascular risk'],
-        recommendation: 'Take aspirin 30 minutes before ibuprofen, or use an alternative pain reliever.',
-      );
-    }
-
-    // Amlodipine + Simvastatin
-    if ((name1.contains('amlodipine') && name2.contains('simvastatin')) ||
-        (name1.contains('simvastatin') && name2.contains('amlodipine'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'Amlodipine inhibits CYP3A4, increasing simvastatin concentration.',
-        severity: InteractionSeverity.contraindicated,
-        symptoms: ['Severe muscle pain', 'Weakness', 'Dark urine', 'Kidney damage'],
-        recommendation: 'Limit simvastatin to 20mg daily when used with amlodipine.',
-      );
-    }
-
-    // Antacids + Antibiotics (e.g., Ciprofloxacin)
-    if ((_isAntacid(name1) && _isAntibiotic(name2)) ||
-        (_isAntacid(name2) && _isAntibiotic(name1))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'Antacids reduce the absorption of antibiotics, making them less effective.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Reduced antibiotic effectiveness', 'Treatment failure', 'Recurrent infection'],
-        recommendation: 'Take antibiotic at least 2 hours before or 6 hours after antacids.',
+        symptoms: ['Constipation', 'Diarrhea', 'Stomach cramps'],
+        recommendation: 'Avoid using multiple antacids together unless prescribed. Monitor for gastrointestinal symptoms.',
       );
     }
 
@@ -534,22 +505,17 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   bool _isAntacid(String drugName) {
     final name = drugName.toLowerCase();
-    return name.contains('tums') ||
-        name.contains('maalox') ||
-        name.contains('pepcid') ||
-        name.contains('zantac') ||
-        name.contains('prilosec') ||
-        name.contains('omeprazole') ||
-        name.contains('pantoprazole') ||
-        name.contains('lansoprazole') ||
-        name.contains('antacid') ||
-        name.contains('gaviscon');
+    return name.contains('aluminium hydroxide') ||
+        name.contains('magnesium hydroxide') ||
+        name.contains('calcium carbonate') ||
+        name.contains('sodium bicarbonate') ||
+        name.contains('combination antacid') ||
+        name.contains('antacid');
   }
 
   bool _isAntibiotic(String drugName) {
     final name = drugName.toLowerCase();
-    return name.contains('ciprofloxacin') ||
-        name.contains('amoxicillin') ||
+    return name.contains('amoxicillin') ||
         name.contains('azithromycin') ||
         name.contains('doxycycline') ||
         name.contains('cephalexin') ||
@@ -608,8 +574,7 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   Widget _buildPatientCard(BuildContext context, User patient) {
-    // TODO: In a real app, fetch actual patient health data
-    // For now, showing patient info without health metrics
+    // Navigate to patient details screen to view/add prescriptions
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
@@ -628,11 +593,10 @@ class _DashboardContentState extends State<_DashboardContent> {
         subtitle: Text(patient.email),
         trailing: const Icon(Icons.chevron_right),
         onTap: () {
-          // Navigate to patient details
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('View details for ${patient.name}'),
-              duration: const Duration(seconds: 2),
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PatientDetailsScreen(patient: patient),
             ),
           );
         },

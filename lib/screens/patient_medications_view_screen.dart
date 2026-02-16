@@ -5,10 +5,12 @@ import '../models/user.dart';
 import '../services/firestore_service.dart';
 import 'prescribe_medication_screen.dart';
 
+
 class PatientMedicationsViewScreen extends StatefulWidget {
   final User patient;
+  final bool showHistory;
 
-  const PatientMedicationsViewScreen({super.key, required this.patient});
+  const PatientMedicationsViewScreen({super.key, required this.patient, this.showHistory = false});
 
   @override
   State<PatientMedicationsViewScreen> createState() => _PatientMedicationsViewScreenState();
@@ -29,7 +31,11 @@ class _PatientMedicationsViewScreenState extends State<PatientMedicationsViewScr
     _firestoreService.getMedicationsForUser(widget.patient.id).listen((medications) {
       if (mounted) {
         setState(() {
-          _medications = medications;
+          if (widget.showHistory) {
+            _medications = medications.where((m) => !m.isActive).toList();
+          } else {
+            _medications = medications;
+          }
           _isLoading = false;
         });
       }
@@ -96,21 +102,25 @@ class _PatientMedicationsViewScreenState extends State<PatientMedicationsViewScr
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.patient.name}\'s Medications'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PrescribeMedicationScreen(patient: widget.patient),
+        title: Text(widget.showHistory
+            ? '${widget.patient.name}\'s Medication History'
+            : '${widget.patient.name}\'s Medications'),
+        actions: widget.showHistory
+            ? null
+            : [
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PrescribeMedicationScreen(patient: widget.patient),
+                      ),
+                    );
+                  },
+                  tooltip: 'Add medication',
                 ),
-              );
-            },
-            tooltip: 'Add medication',
-          ),
-        ],
+              ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -159,7 +169,7 @@ class _PatientMedicationsViewScreenState extends State<PatientMedicationsViewScr
                     return _buildMedicationCard(context, medication);
                   },
                 ),
-      floatingActionButton: _medications.isNotEmpty
+      floatingActionButton: (!widget.showHistory && _medications.isNotEmpty)
           ? FloatingActionButton(
               onPressed: () {
                 Navigator.push(

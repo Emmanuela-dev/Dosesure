@@ -110,6 +110,30 @@ class _ClinicianPatientsScreenState extends State<ClinicianPatientsScreen> {
                           style: Theme.of(context).textTheme.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            // Test navigation with dummy patient
+                            final testPatient = User(
+                              id: 'test123',
+                              name: 'Test Patient',
+                              email: 'test@patient.com',
+                              role: UserRole.patient,
+                            );
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PatientDetailsScreen(patient: testPatient),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.bug_report),
+                          label: const Text('Test Patient Details'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
                       ],
                     ),
                   )
@@ -132,108 +156,151 @@ class _ClinicianPatientsScreenState extends State<ClinicianPatientsScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).primaryColor,
-          child: Text(
-            patient.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join(),
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-        title: Text(patient.name),
-        subtitle: Text(patient.email),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Patient',
-                style: TextStyle(
-                  color: Colors.blue,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+      child: InkWell(
+        onTap: () {
+          // Navigate to patient details when card is tapped
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PatientDetailsScreen(patient: patient),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.info_outline, color: Colors.blue),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PatientDetailsScreen(patient: patient),
+          ).then((_) => _loadPatients());
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top row with patient info
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Theme.of(context).primaryColor,
+                    child: Text(
+                      patient.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join().toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                );
-              },
-              tooltip: 'View Details',
-            ),
-          ],
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Email: ${patient.email}'),
-                Text('Patient ID: ${patient.id}'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => PatientMedicationsViewScreen(patient: patient),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.visibility, size: 18),
-                        label: const Text('View Medications'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => PrescribeMedicationScreen(patient: patient),
-                            ),
-                          ).then((result) {
-                            if (result == true) {
-                              // Refresh if medication was added
-                              _loadPatients();
-                            }
-                          });
-                        },
-                        icon: const Icon(Icons.medication, size: 18),
-                        label: const Text('Prescribe Medication'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          patient.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          patient.email,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Text(
+                      'Patient',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              // Action buttons row
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PatientDetailsScreen(patient: patient),
+                          ),
+                        ).then((_) => _loadPatients());
+                      },
+                      icon: const Icon(Icons.person, size: 18),
+                      label: const Text('View Details'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.blue,
+                        side: const BorderSide(color: Colors.blue),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PrescribeMedicationScreen(patient: patient),
+                          ),
+                        ).then((result) {
+                          if (result == true) {
+                            _loadPatients();
+                          }
+                        });
+                      },
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Prescribe'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // View medications button
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PatientMedicationsViewScreen(patient: patient),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.medication, size: 18),
+                  label: const Text('View Current Medications'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey[700],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
