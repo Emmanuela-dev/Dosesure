@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/medication.dart';
 import '../models/dose_intake.dart';
 import '../models/dose_log.dart';
@@ -27,7 +28,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('DoseSure'),
+        title: const Text('DawaTrack'),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications),
@@ -791,6 +792,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     final userId = authProvider.currentUser?.id;
     if (userId == null) return;
 
+    await _requestAlarmPermissions();
+
     final now = DateTime.now();
     final timeParts = time.split(':');
     final hour = int.parse(timeParts[0]);
@@ -841,11 +844,20 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error confirming dose: $e'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
+    }
+  }
+
+  Future<void> _requestAlarmPermissions() async {
+    if (await Permission.scheduleExactAlarm.isDenied) {
+      await Permission.scheduleExactAlarm.request();
+    }
+    if (await Permission.notification.isDenied) {
+      await Permission.notification.request();
     }
   }
 

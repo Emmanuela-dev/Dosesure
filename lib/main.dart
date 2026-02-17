@@ -55,7 +55,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HealthDataProvider()),
       ],
       child: MaterialApp(
-        title: 'DoseSure',
+        title: 'DawaTrack',
         theme: AppTheme.lightTheme,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
