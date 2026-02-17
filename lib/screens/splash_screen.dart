@@ -60,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'DoseSure',
+              'DawaTrack',
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                 color: Theme.of(context).primaryColor,
                 fontWeight: FontWeight.bold,

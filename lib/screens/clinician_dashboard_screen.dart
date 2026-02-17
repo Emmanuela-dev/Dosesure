@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../services/firestore_service.dart';
 import '../models/user.dart';
 import 'clinician_patients_screen.dart';
@@ -49,6 +50,12 @@ class _ClinicianDashboardScreenState extends State<ClinicianDashboardScreen> {
               );
             },
           ),
+          IconButton(
+            icon: Icon(Theme.of(context).brightness == Brightness.dark ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () {
+              Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
+            },
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.person),
             onSelected: (value) async {
@@ -74,7 +81,10 @@ class _ClinicianDashboardScreenState extends State<ClinicianDashboardScreen> {
                 if (confirm == true && context.mounted) {
                   await Provider.of<AuthProvider>(context, listen: false).signOut();
                   if (context.mounted) {
-                    Navigator.of(context).pushReplacementNamed('/login');
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+                      (route) => false,
+                    );
                   }
                 }
               }

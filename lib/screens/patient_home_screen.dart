@@ -7,12 +7,14 @@ import '../models/dose_intake.dart';
 import '../models/dose_log.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
 import 'medication_list_screen.dart';
 import 'side_effects_screen.dart';
 import 'herbal_use_screen.dart';
 import 'history_screen.dart';
+import 'role_selection_screen.dart';
 
 class PatientHomeScreen extends StatefulWidget {
   const PatientHomeScreen({super.key});
@@ -34,6 +36,12 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             icon: const Icon(Icons.notifications),
             onPressed: () {
               _showNotifications(context);
+            },
+          ),
+          IconButton(
+            icon: Icon(Theme.of(context).brightness == Brightness.dark ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () {
+              Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
             },
           ),
           PopupMenuButton<String>(
@@ -61,7 +69,10 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                 if (confirm == true && context.mounted) {
                   await Provider.of<AuthProvider>(context, listen: false).signOut();
                   if (context.mounted) {
-                    Navigator.of(context).pushReplacementNamed('/login');
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+                      (route) => false,
+                    );
                   }
                 }
               }
