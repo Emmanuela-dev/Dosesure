@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/health_data_provider.dart';
-import 'providers/theme_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
 import 'services/notification_service.dart';
@@ -54,19 +53,12 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => HealthDataProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
-          return MaterialApp(
-            title: 'DawaTrack',
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
-            home: const SplashScreen(),
-            debugShowCheckedModeBanner: false,
-          );
-        },
+      child: MaterialApp(
+        title: 'DawaTrack',
+        theme: AppTheme.lightTheme,
+        home: const SplashScreen(),
+        debugShowCheckedModeBanner: false,
       ),
     );
   }

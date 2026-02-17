@@ -7,7 +7,6 @@ import '../models/dose_intake.dart';
 import '../models/dose_log.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/theme_provider.dart';
 import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
 import 'medication_list_screen.dart';
@@ -36,12 +35,6 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             icon: const Icon(Icons.notifications),
             onPressed: () {
               _showNotifications(context);
-            },
-          ),
-          IconButton(
-            icon: Icon(Theme.of(context).brightness == Brightness.dark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () {
-              Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
             },
           ),
           PopupMenuButton<String>(
