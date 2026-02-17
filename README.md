@@ -82,22 +82,6 @@ DawaTrack bridges the gap between patients and healthcare providers by offering 
 - **Notifications**: flutter_local_notifications with timezone support
 - **Permissions**: permission_handler
 
-### Key Dependencies
-```yaml
-dependencies:
-  flutter: sdk: flutter
-  provider: ^6.1.2
-  intl: ^0.19.0
-  shared_preferences: ^2.3.3
-  google_fonts: ^6.2.1
-  flutter_local_notifications: ^17.2.2
-  timezone: ^0.9.4
-  permission_handler: ^11.3.1
-  firebase_core: ^3.8.1
-  firebase_auth: ^5.3.4
-  cloud_firestore: ^5.5.2
-  firebase_storage: ^12.3.6
-```
 
 ### Project Structure
 ```
@@ -135,39 +119,6 @@ android/
 └── app/src/main/
     └── AndroidManifest.xml            # Android permissions
 ```
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Flutter SDK 3.9.2 or higher
-- Android Studio / VS Code with Flutter extensions
-- Firebase project configured
-- Android device or emulator (API level 21+)
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd dosesure
-```
-
-2. **Install dependencies**
-```bash
-flutter pub get
-```
-
-3. **Configure Firebase**
-- Create a Firebase project at https://console.firebase.google.com
-- Add Android app to Firebase project
-- Download `google-services.json` and place in `android/app/`
-- Run `flutterfire configure` to generate Firebase options
-
-4. **Run the app**
-```bash
-flutter run
-```
-
 ### First-Time Setup
 
 1. **Grant Permissions**: On first launch, allow:
@@ -273,68 +224,6 @@ Patient → Confirm Button → _confirmDoseIntake()
 → Calculate Next Dose Time → Schedule New Alarm → Show Confirmation
 ```
 
-## 📊 Database Schema
-
-### Users Collection
-```javascript
-{
-  id: string,
-  email: string,
-  name: string,
-  role: number, // 0 = patient, 1 = clinician
-  doctorId: string?, // for patients
-  specialization: string?, // for clinicians
-  createdAt: timestamp
-}
-```
-
-### Medications Collection
-```javascript
-{
-  id: string,
-  userId: string,
-  name: string,
-  dosage: string,
-  frequency: string,
-  times: string[],
-  instructions: string,
-  startDate: timestamp,
-  endDate: timestamp?,
-  isActive: boolean,
-  prescribedBy: string,
-  prescribedByName: string,
-  createdAt: timestamp
-}
-```
-
-### DoseIntakes Collection
-```javascript
-{
-  id: string,
-  userId: string,
-  medicationId: string,
-  medicationName: string,
-  takenAt: timestamp,
-  scheduledTime: string,
-  nextDueTime: timestamp,
-  createdAt: timestamp
-}
-```
-
-### DoseLogs Collection
-```javascript
-{
-  id: string,
-  userId: string,
-  medicationId: string,
-  scheduledTime: timestamp,
-  takenTime: timestamp?,
-  taken: boolean,
-  notes: string?,
-  createdAt: timestamp
-}
-```
-
 ## 🎨 UI/UX Features
 
 - **Material Design**: Clean, modern interface following Material Design guidelines
@@ -358,30 +247,3 @@ Patient → Confirm Button → _confirmDoseIntake()
 - [ ] Telemedicine integration
 - [ ] AI-powered adherence predictions
 
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 👥 Contributors
-
-- Development Team: [Your Team Name]
-- Project Type: Healthcare Management System
-- Target Users: Patients and Healthcare Providers
-
-## 📞 Support
-
-For issues, questions, or feature requests:
-- Email: support@dawatrack.app
-- GitHub Issues: [Repository Issues Page]
-- Documentation: [Wiki/Docs Link]
-
-## 🙏 Acknowledgments
-
-- Flutter team for the amazing framework
-- Firebase for backend infrastructure
-- flutter_local_notifications plugin maintainers
-- Healthcare professionals who provided domain expertise
-
----
-
-**Note**: This app is designed to assist with medication management but should not replace professional medical advice. Always consult healthcare providers for medical decisions.
