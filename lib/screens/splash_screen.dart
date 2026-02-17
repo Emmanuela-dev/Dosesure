@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/health_data_provider.dart';
 import 'role_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkAuth() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final healthProvider = Provider.of<HealthDataProvider>(context, listen: false);
     
     // Initialize auth state listener
     authProvider.initAuthStateListener();
@@ -28,6 +30,11 @@ class _SplashScreenState extends State<SplashScreen> {
     
     // Load user if exists
     await authProvider.loadUser();
+    
+    // Initialize health data for logged-in user
+    if (authProvider.currentUser != null) {
+      healthProvider.initializeForUser(authProvider.currentUser!.id);
+    }
 
     // Simulate loading time
     await Future.delayed(const Duration(seconds: 2));

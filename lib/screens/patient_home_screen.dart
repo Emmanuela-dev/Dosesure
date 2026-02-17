@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../models/drug_interaction.dart';
 import '../models/medication.dart';
+import '../models/dose_intake.dart';
+import '../models/dose_log.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/drug_interaction_graph.dart';
+import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 import 'medication_list_screen.dart';
 import 'side_effects_screen.dart';
 import 'herbal_use_screen.dart';
 import 'history_screen.dart';
-import 'drug_interaction_screen.dart';
 
 class PatientHomeScreen extends StatefulWidget {
   const PatientHomeScreen({super.key});
@@ -110,7 +111,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
               const SizedBox(height: 32),
               _buildHealthSummary(),
               const SizedBox(height: 32),
-              _buildDrugInteractionSection(),
+              _buildMedicationProgressGraph(),
             ],
           ),
         ),
@@ -134,7 +135,6 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
         onTap: (index) {
           switch (index) {
             case 0:
-              // Already on home
               break;
             case 1:
               Navigator.push(
@@ -285,9 +285,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           'Log Dose',
           Icons.check_circle,
           Colors.green,
-          () {
-            // TODO: Navigate to log dose
-          },
+          () {},
         ),
         _buildActionCard(
           'Medications',
@@ -361,12 +359,6 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     return Consumer<HealthDataProvider>(
       builder: (context, healthData, child) {
         final medications = healthData.medications.where((m) => m.isActive).toList();
-        final graph = _buildInteractionGraph(medications);
-        final interactionCount = graph.interactions.length;
-        final hasHighRisk = graph.interactions.any((i) => 
-          i.severity == InteractionSeverity.high || 
-          i.severity == InteractionSeverity.contraindicated
-        );
         final adherence = healthData.getAdherencePercentage();
 
         return Card(
@@ -396,10 +388,10 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                       hasAlert: adherence < 60,
                     ),
                     _buildSummaryItem(
-                      'Interactions', 
-                      interactionCount > 0 ? '$interactionCount' : 'None', 
-                      hasHighRisk ? Colors.red : (interactionCount > 0 ? Colors.orange : Colors.blue),
-                      hasAlert: hasHighRisk,
+                      'Medications', 
+                      '${medications.length}', 
+                      Colors.blue,
+                      hasAlert: false,
                     ),
                     _buildSummaryItem(
                       'Side Effects', 
@@ -458,23 +450,15 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     );
   }
 
-  Widget _buildDrugInteractionSection() {
+  Widget _buildMedicationProgressGraph() {
     return Consumer<HealthDataProvider>(
       builder: (context, healthData, child) {
         final medications = healthData.medications.where((m) => m.isActive).toList();
-        final graph = _buildInteractionGraph(medications);
-        final hasInteractions = graph.interactions.isNotEmpty;
-        final hasHighRisk = graph.interactions.any((i) => 
-          i.severity == InteractionSeverity.high || 
-          i.severity == InteractionSeverity.contraindicated
-        );
 
         return Card(
-          elevation: hasHighRisk ? 8 : 2,
-          color: hasHighRisk ? Colors.red.shade50 : null,
+          elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: hasHighRisk ? BorderSide(color: Colors.red, width: 2) : BorderSide.none,
           ),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -484,57 +468,21 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        if (hasHighRisk) ...[
-                          Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-                          const SizedBox(width: 8),
-                        ],
-                        Text(
-                          'Drug Interactions',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: hasHighRisk ? Colors.red.shade900 : null,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'Medication Schedule',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const DrugInteractionScreen()),
-                        );
-                      },
-                      child: const Text('View Details'),
-                    ),
+                    Icon(Icons.schedule, color: Theme.of(context).primaryColor),
                   ],
                 ),
-                if (hasHighRisk) ...[
-                  const SizedBox(height: 12),
-                  _buildAlertBanner(graph.interactions),
-                ],
                 const SizedBox(height: 16),
                 if (medications.isEmpty)
                   _buildEmptyState('No active medications', Icons.medication_outlined)
-                else if (!hasInteractions)
-                  _buildNoInteractionsState()
                 else
                   Column(
-                    children: [
-                      SizedBox(
-                        height: 300,
-                        child: DrugInteractionGraphWidget(
-                          graph: graph,
-                          primaryColor: hasHighRisk ? Colors.red : Theme.of(context).primaryColor,
-                          onDrugSelected: (drugId) {
-                            // Handle drug selection if needed
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildInteractionSummary(graph.interactions),
-                    ],
+                    children: medications.map((med) => _buildMedicationTimeline(med, healthData)).toList(),
                   ),
               ],
             ),
@@ -544,252 +492,187 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     );
   }
 
-  Widget _buildAlertBanner(List<DrugInteraction> interactions) {
-    final highRiskCount = interactions.where((i) => 
-      i.severity == InteractionSeverity.high || 
-      i.severity == InteractionSeverity.contraindicated
-    ).length;
+  Widget _buildMedicationTimeline(Medication medication, HealthDataProvider healthData) {
+    final now = DateTime.now();
+    final doseLogs = healthData.getDoseLogsForMedication(medication.id);
+    final todayLogs = doseLogs.where((log) {
+      final logDate = log.scheduledTime;
+      return logDate.year == now.year && logDate.month == now.month && logDate.day == now.day;
+    }).toList();
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.shade100,
+        color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade300),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.priority_high, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ALERT: High-Risk Interaction Detected!',
-                  style: TextStyle(
-                    color: Colors.red.shade900,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$highRiskCount serious interaction${highRiskCount > 1 ? 's' : ''} found. Contact your doctor immediately.',
-                  style: TextStyle(
-                    color: Colors.red.shade800,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInteractionSummary(List<DrugInteraction> interactions) {
-    final severityCounts = {
-      InteractionSeverity.low: 0,
-      InteractionSeverity.moderate: 0,
-      InteractionSeverity.high: 0,
-      InteractionSeverity.contraindicated: 0,
-    };
-
-    for (var interaction in interactions) {
-      severityCounts[interaction.severity] = (severityCounts[interaction.severity] ?? 0) + 1;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Interaction Summary',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          ),
-          const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              if (severityCounts[InteractionSeverity.contraindicated]! > 0)
-                _buildSeverityBadge('Contraindicated', severityCounts[InteractionSeverity.contraindicated]!, Colors.red.shade900),
-              if (severityCounts[InteractionSeverity.high]! > 0)
-                _buildSeverityBadge('High', severityCounts[InteractionSeverity.high]!, Colors.red),
-              if (severityCounts[InteractionSeverity.moderate]! > 0)
-                _buildSeverityBadge('Moderate', severityCounts[InteractionSeverity.moderate]!, Colors.orange),
-              if (severityCounts[InteractionSeverity.low]! > 0)
-                _buildSeverityBadge('Low', severityCounts[InteractionSeverity.low]!, Colors.yellow.shade700),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.medication,
+                  color: Theme.of(context).primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      medication.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      '${medication.dosage} - ${medication.frequency}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Text(
+            'Today\'s Schedule',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...medication.times.map((time) {
+            final timeParts = time.split(':');
+            final hour = int.parse(timeParts[0]);
+            final minute = int.parse(timeParts[1]);
+            final scheduleTime = DateTime(now.year, now.month, now.day, hour, minute);
+            
+            final isTaken = todayLogs.any((log) {
+              final logTime = log.scheduledTime;
+              return logTime.hour == hour && logTime.minute == minute && log.taken;
+            });
+            
+            final isPast = now.isAfter(scheduleTime);
+            final isUpcoming = !isPast && scheduleTime.difference(now).inMinutes <= 30;
+
+            return _buildTimeSlot(time, isTaken, isPast, isUpcoming, medication, healthData);
+          }).toList(),
         ],
       ),
     );
   }
 
-  Widget _buildSeverityBadge(String label, int count, Color color) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            '$count',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+  Widget _buildTimeSlot(String time, bool isTaken, bool isPast, bool isUpcoming, Medication medication, HealthDataProvider healthData) {
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    if (isTaken) {
+      statusColor = Colors.green;
+      statusIcon = Icons.check_circle;
+      statusText = 'Taken';
+    } else if (isUpcoming) {
+      statusColor = Colors.orange;
+      statusIcon = Icons.access_time;
+      statusText = 'Upcoming';
+    } else if (isPast) {
+      statusColor = Colors.red;
+      statusIcon = Icons.cancel;
+      statusText = 'Missed';
+    } else {
+      statusColor = Colors.blue;
+      statusIcon = Icons.schedule;
+      statusText = 'Scheduled';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: isUpcoming && !isTaken
+          ? ElevatedButton(
+              onPressed: () => _confirmDoseIntake(medication, time, healthData),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: statusColor,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Confirm $time dose',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.touch_app, color: Colors.white, size: 18),
+                ],
+              ),
+            )
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: statusColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(statusIcon, color: statusColor, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    time,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: statusColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
-        ),
-      ],
     );
-  }
-
-  DrugInteractionGraph _buildInteractionGraph(List<Medication> medications) {
-    // Create drug nodes from medications
-    final nodes = medications.map((med) {
-      final category = _getDrugCategory(med.name);
-      return DrugNode(
-        id: med.id,
-        name: med.name,
-        category: category,
-      );
-    }).toList();
-
-    // Create interactions based on known drug interactions
-    final interactions = <DrugInteraction>[];
-
-    for (int i = 0; i < medications.length; i++) {
-      for (int j = i + 1; j < medications.length; j++) {
-        final interaction = _checkInteraction(medications[i], medications[j]);
-        if (interaction != null) {
-          interactions.add(interaction);
-        }
-      }
-    }
-
-    return DrugInteractionGraph(nodes: nodes, interactions: interactions);
-  }
-
-  String _getDrugCategory(String drugName) {
-    final name = drugName.toLowerCase();
-    if (name.contains('aspirin') || name.contains('warfarin') || name.contains('heparin')) {
-      return 'Anticoagulant';
-    } else if (name.contains('metformin') || name.contains('glipizide') || name.contains('insulin')) {
-      return 'Antidiabetic';
-    } else if (name.contains('lisinopril') || name.contains('amlodipine') || name.contains('atenolol')) {
-      return 'Cardiovascular';
-    } else if (name.contains('omeprazole') || name.contains('pantoprazole')) {
-      return 'Proton Pump Inhibitor';
-    } else if (name.contains('acetaminophen') || name.contains('ibuprofen')) {
-      return 'Analgesic';
-    } else if (name.contains('atorvastatin') || name.contains('simvastatin')) {
-      return 'Statin';
-    } else if (name.contains('aluminium hydroxide') || name.contains('calcium carbonate') || 
-               name.contains('magnesium hydroxide') || name.contains('sodium bicarbonate') || 
-               name.contains('combination antacid') || name.contains('antacid')) {
-      return 'Antacid';
-    }
-    return 'Other';
-  }
-
-  DrugInteraction? _checkInteraction(Medication drug1, Medication drug2) {
-    final name1 = drug1.name.toLowerCase();
-    final name2 = drug2.name.toLowerCase();
-
-    // Aspirin + Warfarin
-    if ((name1.contains('aspirin') && name2.contains('warfarin')) ||
-        (name1.contains('warfarin') && name2.contains('aspirin'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'Increased risk of bleeding. Aspirin enhances the anticoagulant effect of warfarin.',
-        severity: InteractionSeverity.high,
-        symptoms: ['Easy bruising', 'Nosebleeds', 'Black stools', 'Prolonged bleeding'],
-        recommendation: 'Avoid combination unless specifically prescribed. Monitor INR closely.',
-      );
-    }
-
-    // Ibuprofen + Aspirin
-    if ((name1.contains('ibuprofen') && name2.contains('aspirin')) ||
-        (name1.contains('aspirin') && name2.contains('ibuprofen'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'Ibuprofen may reduce the cardioprotective effects of aspirin.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Reduced aspirin effectiveness', 'Increased cardiovascular risk'],
-        recommendation: 'Take aspirin 30 minutes before ibuprofen, or use an alternative pain reliever.',
-      );
-    }
-
-    // Lisinopril + Potassium
-    if ((name1.contains('lisinopril') && name2.contains('potassium')) ||
-        (name1.contains('potassium') && name2.contains('lisinopril'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'ACE inhibitors can cause potassium retention, leading to hyperkalemia.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Muscle weakness', 'Irregular heartbeat', 'Fatigue'],
-        recommendation: 'Monitor potassium levels regularly. Limit potassium-rich foods.',
-      );
-    }
-
-    // Metformin + Alcohol (note: not typically a "medication" but for demonstration)
-    if ((name1.contains('metformin') && name2.contains('alcohol')) ||
-        (name1.contains('alcohol') && name2.contains('metformin'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'Alcohol increases the risk of lactic acidosis with metformin.',
-        severity: InteractionSeverity.high,
-        symptoms: ['Lactic acidosis', 'Nausea', 'Abdominal pain', 'Difficulty breathing'],
-        recommendation: 'Limit alcohol consumption while taking metformin.',
-      );
-    }
-
-    // Simvastatin + Grapefruit
-    if ((name1.contains('simvastatin') && name2.contains('grapefruit')) ||
-        (name1.contains('grapefruit') && name2.contains('simvastatin'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description: 'Grapefruit inhibits CYP3A4 enzyme, increasing statin levels and risk of muscle toxicity.',
-        severity: InteractionSeverity.high,
-        symptoms: ['Muscle pain', 'Dark urine', 'Fatigue', 'Liver problems'],
-        recommendation: 'Avoid grapefruit and grapefruit juice while on simvastatin.',
-      );
-    }
-
-    return null;
   }
 
   Widget _buildEmptyState(String message, IconData icon) {
@@ -810,50 +693,16 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     );
   }
 
-  Widget _buildNoInteractionsState() {
-    return Container(
-      height: 150,
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.check_circle, size: 48, color: Colors.green),
-          const SizedBox(height: 8),
-          Text(
-            'No drug interactions detected',
-            style: TextStyle(
-              color: Colors.green[700],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Your medications are safe to take together',
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showNotifications(BuildContext context) {
     final healthData = Provider.of<HealthDataProvider>(context, listen: false);
     final medications = healthData.medications.where((m) => m.isActive).toList();
-    final graph = _buildInteractionGraph(medications);
-    final hasHighRisk = graph.interactions.any((i) => 
-      i.severity == InteractionSeverity.high || 
-      i.severity == InteractionSeverity.contraindicated
-    );
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(
-              hasHighRisk ? Icons.warning : Icons.notifications,
-              color: hasHighRisk ? Colors.red : Colors.blue,
-            ),
+            Icon(Icons.notifications, color: Colors.blue),
             const SizedBox(width: 8),
             const Text('Notifications'),
           ],
@@ -863,32 +712,6 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (hasHighRisk) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.priority_high, color: Colors.red),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'High-risk drug interaction detected!',
-                          style: TextStyle(
-                            color: Colors.red.shade900,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
               _buildNotificationItem(
                 'Medication Reminder',
                 'Time to take your medications',
@@ -902,15 +725,13 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                 Icons.check_circle,
                 Colors.green,
               ),
-              if (graph.interactions.isNotEmpty) ...[
-                const Divider(),
-                _buildNotificationItem(
-                  'Drug Interactions',
-                  '${graph.interactions.length} interaction${graph.interactions.length > 1 ? 's' : ''} detected',
-                  Icons.warning,
-                  hasHighRisk ? Colors.red : Colors.orange,
-                ),
-              ],
+              const Divider(),
+              _buildNotificationItem(
+                'Active Medications',
+                '${medications.length} medication${medications.length != 1 ? 's' : ''} in your schedule',
+                Icons.schedule,
+                Colors.orange,
+              ),
             ],
           ),
         ),
@@ -963,5 +784,82 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
         ],
       ),
     );
+  }
+
+  void _confirmDoseIntake(Medication medication, String time, HealthDataProvider healthData) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.currentUser?.id;
+    if (userId == null) return;
+
+    final now = DateTime.now();
+    final timeParts = time.split(':');
+    final hour = int.parse(timeParts[0]);
+    final minute = int.parse(timeParts[1]);
+    
+    DateTime nextDueTime = _calculateNextDoseTime(now, medication.frequency, medication.times, time);
+    
+    final intake = DoseIntake(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      medicationId: medication.id,
+      medicationName: medication.name,
+      takenAt: now,
+      scheduledTime: time,
+      nextDueTime: nextDueTime,
+    );
+
+    final doseLog = DoseLog(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      medicationId: medication.id,
+      scheduledTime: DateTime(now.year, now.month, now.day, hour, minute),
+      takenTime: now,
+      taken: true,
+    );
+
+    try {
+      await FirestoreService().recordDoseIntake(userId, intake);
+      await healthData.logDose(userId, doseLog);
+      await NotificationService().scheduleMedicationReminders(medication);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('${medication.name} dose confirmed!\nNext dose: ${DateFormat('MMM d, h:mm a').format(nextDueTime)}'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error confirming dose: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  DateTime _calculateNextDoseTime(DateTime current, String frequency, List<String> times, String currentTime) {
+    final currentIndex = times.indexOf(currentTime);
+    
+    if (currentIndex < times.length - 1) {
+      final nextTime = times[currentIndex + 1];
+      final parts = nextTime.split(':');
+      return DateTime(current.year, current.month, current.day, int.parse(parts[0]), int.parse(parts[1]));
+    }
+    
+    final firstTime = times[0];
+    final parts = firstTime.split(':');
+    return DateTime(current.year, current.month, current.day + 1, int.parse(parts[0]), int.parse(parts[1]));
   }
 }

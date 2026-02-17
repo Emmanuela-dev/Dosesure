@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/firestore_service.dart';
 import '../models/medication.dart';
 import '../models/drug.dart';
 import '../models/user.dart';
@@ -138,9 +139,9 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
     );
 
     try {
-      // Add medication for the patient
-      await Provider.of<HealthDataProvider>(context, listen: false)
-          .addMedication(widget.patient.id, medication);
+      // Add medication directly to Firestore for the patient
+      final firestoreService = FirestoreService();
+      await firestoreService.addMedication(widget.patient.id, medication);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

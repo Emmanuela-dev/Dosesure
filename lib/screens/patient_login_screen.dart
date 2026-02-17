@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/health_data_provider.dart';
 import '../models/user.dart';
 import 'patient_home_screen.dart';
 import 'patient_register_screen.dart';
@@ -33,11 +34,18 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final healthProvider = Provider.of<HealthDataProvider>(context, listen: false);
+      
       await authProvider.login(
         _emailController.text.trim(),
         _passwordController.text,
         UserRole.patient,
       );
+
+      // Initialize health data for the logged-in patient
+      if (authProvider.currentUser != null) {
+        healthProvider.initializeForUser(authProvider.currentUser!.id);
+      }
 
       if (mounted) {
         Navigator.of(context).pushReplacement(

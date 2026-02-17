@@ -6,6 +6,7 @@ import '../models/dose_log.dart';
 import '../models/side_effect.dart';
 import '../models/herbal_use.dart';
 import '../models/drug.dart';
+import '../models/dose_intake.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -17,6 +18,7 @@ class FirestoreService {
   CollectionReference get _sideEffectsCollection => _firestore.collection('sideEffects');
   CollectionReference get _herbalUsesCollection => _firestore.collection('herbalUses');
   CollectionReference get _drugsCollection => _firestore.collection('drugs');
+  CollectionReference get _doseIntakesCollection => _firestore.collection('doseIntakes');
 
   // ==================== USER METHODS ====================
 
@@ -428,6 +430,49 @@ class FirestoreService {
         .where('isActive', isEqualTo: true)
         .get();
     return snapshot.docs.length;
+  }
+
+  // ==================== DOSE INTAKE METHODS ====================
+
+  // Record dose intake
+  Future<String> recordDoseIntake(String userId, DoseIntake intake) async {
+    final docRef = await _doseIntakesCollection.add({
+      ...intake.toJson(),
+      'userId': userId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  // Get dose intakes for a medication
+  Stream<List<DoseIntake>> getDoseIntakesForMedication(String medicationId) {
+    return _doseIntakesCollection
+        .where('medicationId', isEqualTo: medicationId)
+        .orderBy('takenAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => DoseIntake.fromJson({
+                  ...doc.data() as Map<String, dynamic>,
+                  'id': doc.id,
+                }))
+            .toList());
+  }
+
+  // Get latest dose intake for a medication
+  Future<DoseIntake?> getLatestDoseIntake(String medicationId) async {
+    final snapshot = await _doseIntakesCollection
+        .where('medicationId', isEqualTo: medicationId)
+        .orderBy('takenAt', descending: true)
+        .limit(1)
+        .get();
+    
+    if (snapshot.docs.isEmpty) return null;
+    
+    final doc = snapshot.docs.first;
+    return DoseIntake.fromJson({
+      ...doc.data() as Map<String, dynamic>,
+      'id': doc.id,
+    });
   }
 
   // ==================== DRUG METHODS ====================
