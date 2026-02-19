@@ -4,6 +4,7 @@ import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/side_effect.dart';
 import '../models/medication.dart';
+import '../widgets/comment_section.dart';
 
 class SideEffectsScreen extends StatefulWidget {
   const SideEffectsScreen({super.key});
@@ -278,6 +279,10 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 8),
+            // Doctor/clinician comments section
+            if (effect.id.isNotEmpty)
+              CommentSection(targetId: effect.id),
           ],
         ),
       ),

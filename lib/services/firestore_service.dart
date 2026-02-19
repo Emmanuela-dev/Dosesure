@@ -7,8 +7,39 @@ import '../models/side_effect.dart';
 import '../models/herbal_use.dart';
 import '../models/drug.dart';
 import '../models/dose_intake.dart';
+import '../models/comment.dart';
 
 class FirestoreService {
+      CollectionReference get _commentsCollection => _firestore.collection('comments');
+
+      // Add a comment (for side effect or herbal use)
+      Future<void> addComment(Comment comment) async {
+        await _commentsCollection.add(comment.toJson());
+      }
+
+      // Get comments for a target (side effect or herbal use)
+      Stream<List<Comment>> getCommentsForTarget(String targetId) {
+        return _commentsCollection
+            .where('targetId', isEqualTo: targetId)
+            .orderBy('createdAt', descending: false)
+            .snapshots()
+            .map((snapshot) => snapshot.docs
+                .map((doc) => Comment.fromJson({
+                      ...doc.data() as Map<String, dynamic>,
+                      'id': doc.id,
+                    }))
+                .toList());
+      }
+    // Add a new patient (auto-generate ID)
+    Future<User> addPatient(User user, {String? doctorId}) async {
+      final docRef = await _usersCollection.add({
+        ...user.toJson(),
+        'role': UserRole.patient.index,
+        if (doctorId != null) 'doctorId': doctorId,
+      });
+      final newUser = user.copyWith(id: docRef.id, doctorId: doctorId);
+      return newUser;
+    }
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Collection references

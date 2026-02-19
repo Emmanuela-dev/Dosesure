@@ -1,6 +1,23 @@
 enum UserRole { patient, clinician }
 
 class User {
+    User copyWith({
+      String? id,
+      String? name,
+      String? email,
+      UserRole? role,
+      String? doctorId,
+      String? notes,
+    }) {
+      return User(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        email: email ?? this.email,
+        role: role ?? this.role,
+        doctorId: doctorId ?? this.doctorId,
+        notes: notes ?? this.notes,
+      );
+    }
   final String id;
   final String name;
   final String email;

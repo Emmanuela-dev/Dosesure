@@ -13,6 +13,7 @@ import 'medication_list_screen.dart';
 import 'side_effects_screen.dart';
 import 'herbal_use_screen.dart';
 import 'history_screen.dart';
+import 'adherence_screen.dart';
 import 'role_selection_screen.dart';
 
 class PatientHomeScreen extends StatefulWidget {
@@ -27,7 +28,15 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
   Widget build(BuildContext context) {
     final today = DateFormat('EEEE, MMMM d').format(DateTime.now());
 
-    return Scaffold(
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final userName = authProvider.currentUser?.name ?? '';
+        final firstName = userName.isNotEmpty && userName != 'User' 
+            ? userName.split(' ').first 
+            : '';
+        final greeting = DateTime.now().hour < 12 ? 'morning' : DateTime.now().hour < 17 ? 'afternoon' : 'evening';
+
+        return Scaffold(
       appBar: AppBar(
         title: const Text('DawaTrack'),
         actions: [
@@ -92,7 +101,9 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Good ${DateTime.now().hour < 12 ? 'morning' : DateTime.now().hour < 17 ? 'afternoon' : 'evening'}!',
+                firstName.isNotEmpty
+                    ? 'Good $greeting, $firstName!'
+                    : 'Good $greeting!',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -156,6 +167,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           }
         },
       ),
+    );
+      },
     );
   }
 
@@ -286,11 +299,21 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildActionCard(
-          'Log Dose',
-          Icons.check_circle,
-          Colors.green,
-          () {},
+        Consumer<HealthDataProvider>(
+          builder: (context, healthData, child) {
+            final adherence = healthData.getAdherencePercentage();
+            return _buildActionCard(
+              'Adherence',
+              Icons.check_circle,
+              adherence >= 80 ? Colors.green : adherence >= 60 ? Colors.orange : Colors.red,
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdherenceScreen()),
+                );
+              },
+            );
+          },
         ),
         _buildActionCard(
           'Medications',

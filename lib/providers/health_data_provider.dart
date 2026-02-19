@@ -29,44 +29,76 @@ class HealthDataProvider with ChangeNotifier {
   List<HerbalUse> get herbalUses => _herbalUses;
   bool get isLoading => _isLoading;
 
+  // Provide all patient data for clinician portal
+  Map<String, dynamic> getPatientData(String patientId) {
+    final patientMeds = _medications.where((m) => m.patientId == patientId).toList();
+    final medIds = patientMeds.map((m) => m.id).toSet();
+    
+    return {
+      'medications': patientMeds,
+      'herbalUses': _herbalUses,
+      'sideEffects': _sideEffects.where((s) => medIds.contains(s.medicationId)).toList(),
+      'adherence': getAdherencePercentageForPatient(patientId),
+      'drugInteractions': _getDrugInteractionsForPatient(patientId),
+    };
+  }
+
+  double getAdherencePercentageForPatient(String patientId) {
+    final meds = _medications.where((m) => m.patientId == patientId).toList();
+    final logs = _doseLogs.where((d) => meds.any((m) => m.id == d.medicationId)).toList();
+    if (logs.isEmpty) return 0.0;
+    final takenDoses = logs.where((log) => log.taken).length;
+    return (takenDoses / logs.length) * 100;
+  }
+
+  List<dynamic> _getDrugInteractionsForPatient(String patientId) {
+    return [];
+  }
+
   // Initialize listeners for a user
   void initializeForUser(String userId) {
-    // Cancel existing subscriptions
     disposeSubscriptions();
 
-    // Subscribe to medications
     _medicationsSubscription = _firestoreService
         .getActiveMedicationsForUser(userId)
-        .listen((medications) {
-      _medications = medications;
-      // Schedule reminders for all active medications
-      _notificationService.scheduleAllMedicationReminders(medications);
-      notifyListeners();
-    });
+        .listen(
+          (medications) {
+            _medications = medications;
+            _notificationService.scheduleAllMedicationReminders(medications);
+            notifyListeners();
+          },
+          onError: (e) => debugPrint('Medications stream error: $e'),
+        );
 
-    // Subscribe to dose logs
     _doseLogsSubscription = _firestoreService
         .getDoseLogsForUser(userId)
-        .listen((doseLogs) {
-      _doseLogs = doseLogs;
-      notifyListeners();
-    });
+        .listen(
+          (doseLogs) {
+            _doseLogs = doseLogs;
+            notifyListeners();
+          },
+          onError: (e) => debugPrint('Dose logs stream error: $e'),
+        );
 
-    // Subscribe to side effects
     _sideEffectsSubscription = _firestoreService
         .getSideEffectsForUser(userId)
-        .listen((sideEffects) {
-      _sideEffects = sideEffects;
-      notifyListeners();
-    });
+        .listen(
+          (sideEffects) {
+            _sideEffects = sideEffects;
+            notifyListeners();
+          },
+          onError: (e) => debugPrint('Side effects stream error: $e'),
+        );
 
-    // Subscribe to herbal uses
     _herbalUsesSubscription = _firestoreService
         .getHerbalUsesForUser(userId)
-        .listen((herbalUses) {
-      _herbalUses = herbalUses;
-      notifyListeners();
-    });
+        .listen(
+          (herbalUses) {
+            _herbalUses = herbalUses;
+            notifyListeners();
+          },
+          onError: (e) => debugPrint('Herbal uses stream error: $e'),
+        );
   }
 
   // Dispose subscriptions

@@ -12,33 +12,20 @@ import 'services/firestore_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('Firebase initialized successfully');
-  } catch (e) {
-    debugPrint('Firebase initialization error: $e');
-    // App will still run but Firebase features won't work
-    // This allows development without Firebase configuration
-  }
-
-  // Initialize notification service
-  try {
+    
     await NotificationService().initialize();
-  } catch (e) {
-    debugPrint('Notification service initialization error: $e');
-  }
-  
-  // Initialize default drugs directly using FirestoreService
-  try {
-    debugPrint('Initializing default drugs...');
-    final firestoreService = FirestoreService();
-    await firestoreService.initializeDefaultDrugs();
-    debugPrint('Default drugs initialization complete');
-  } catch (e) {
-    debugPrint('Error initializing default drugs: $e');
+    debugPrint('Notification service initialized');
+    
+    await FirestoreService().initializeDefaultDrugs();
+    debugPrint('Default drugs initialized');
+  } catch (e, stackTrace) {
+    debugPrint('Initialization error: $e');
+    debugPrint('Stack trace: $stackTrace');
   }
   
   runApp(const MyApp());
@@ -59,6 +46,28 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
+        builder: (context, widget) {
+          ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
+            return Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const SizedBox(height: 16),
+                      const Text('An error occurred', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text(errorDetails.exception.toString(), textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          };
+          return widget!;
+        },
       ),
     );
   }

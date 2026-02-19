@@ -83,17 +83,15 @@ class HistoryScreen extends StatelessWidget {
   }
 
   Widget _buildDoseLogItem(BuildContext context, DoseLog log, HealthDataProvider healthData) {
-    final medication = healthData.medications.firstWhere(
-      (med) => med.id == log.medicationId,
-      orElse: () => Medication(
-        id: 'unknown',
-        name: 'Unknown Medication',
-        dosage: '',
-        frequency: '',
-        times: [],
-        instructions: '',
-        startDate: DateTime.now(),
-      ),
+    // Log dose feature removed
+    final medication = Medication(
+      id: 'unknown',
+      name: 'Unknown Medication',
+      dosage: '',
+      frequency: '',
+      times: [],
+      instructions: '',
+      startDate: DateTime.now(),
     );
 
     return ListTile(

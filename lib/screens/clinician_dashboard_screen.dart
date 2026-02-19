@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
@@ -8,9 +9,11 @@ import 'clinician_patients_screen.dart';
 import 'clinician_reports_screen.dart';
 import 'drug_interaction_screen.dart';
 import 'patient_details_screen.dart';
+import 'role_selection_screen.dart';
+import 'add_patient_screen.dart';
 import '../models/drug_interaction.dart';
-import '../widgets/drug_interaction_graph.dart';
 import '../models/medication.dart';
+import '../widgets/comment_section.dart';
 
 class ClinicianDashboardScreen extends StatefulWidget {
   const ClinicianDashboardScreen({super.key});
@@ -179,7 +182,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                           currentUser!.name.isNotEmpty && 
                           currentUser.name != 'User') 
             ? currentUser.name 
-            : (currentUser?.email?.split('@').first ?? 'Doctor');
+            : (currentUser?.email.split('@').first ?? 'Doctor');
         debugPrint('Dashboard - Current user name: ${currentUser?.name}, Displayed: $userName');
         
         return SafeArea(
@@ -233,17 +236,22 @@ class _DashboardContentState extends State<_DashboardContent> {
   Widget _buildOverviewCards(BuildContext context) {
     return Consumer<HealthDataProvider>(
       builder: (context, healthData, child) {
-        final medications = healthData.medications.length;
-        final sideEffects = healthData.sideEffects.length;
-        final herbalUses = healthData.herbalUses.length;
-        final adherence = healthData.getAdherencePercentage().toStringAsFixed(0);
+        if (_selectedPatient == null) {
+          return const SizedBox.shrink();
+        }
+        final patientId = _selectedPatient!.id;
+        final medications = healthData.medications.where((m) => m.patientId == patientId).toList();
+        final sideEffects = healthData.sideEffects.where((s) => medications.any((m) => m.id == s.medicationId)).toList();
+        final herbalUses = healthData.herbalUses;
+        final doseLogs = healthData.doseLogs.where((d) => medications.any((m) => m.id == d.medicationId)).toList();
+        final adherence = doseLogs.isEmpty ? '0' : ((doseLogs.where((d) => d.taken).length / doseLogs.length) * 100).toStringAsFixed(0);
 
         return Row(
           children: [
             Expanded(
               child: _buildOverviewCard(
                 'Medications',
-                medications.toString(),
+                medications.length.toString(),
                 Icons.medication,
                 Colors.blue,
               ),
@@ -252,7 +260,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             Expanded(
               child: _buildOverviewCard(
                 'Side Effects',
-                sideEffects.toString(),
+                sideEffects.length.toString(),
                 Icons.warning,
                 Colors.orange,
               ),
@@ -261,7 +269,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             Expanded(
               child: _buildOverviewCard(
                 'Herbal Use',
-                herbalUses.toString(),
+                herbalUses.length.toString(),
                 Icons.grass,
                 Colors.green,
               ),
@@ -287,181 +295,204 @@ class _DashboardContentState extends State<_DashboardContent> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: () {
+          if (_selectedPatient == null) return;
+          showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: Text(title),
+                content: SizedBox(
+                  width: 400,
+                  height: 500,
+                  child: _buildDetailListForCard(title, _selectedPatient!.id),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDetailListForCard(String title, String patientId) {
+    return Consumer<HealthDataProvider>(
+      builder: (context, healthData, child) {
+        if (title == 'Side Effects') {
+          final meds = healthData.medications.where((m) => m.patientId == patientId).toList();
+          final sideEffects = healthData.sideEffects.where((s) => meds.any((m) => m.id == s.medicationId)).toList();
+          if (sideEffects.isEmpty) return const Text('No side effects reported.');
+          return ListView(
+            shrinkWrap: true,
+            children: sideEffects.map((effect) => Card(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(effect.description, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    if (effect.notes != null && effect.notes!.isNotEmpty)
+                      Text('Notes: ${effect.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),
+                    const SizedBox(height: 4),
+                    CommentSection(targetId: effect.id),
+                  ],
+                ),
+              ),
+            )).toList(),
+          );
+        } else if (title == 'Herbal Use') {
+          final herbalUses = healthData.herbalUses;
+          if (herbalUses.isEmpty) return const Text('No herbal drug use reported.');
+          return ListView(
+            shrinkWrap: true,
+            children: herbalUses.map((herbal) => Card(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(herbal.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text('${herbal.dosage} - ${herbal.frequency}'),
+                    if (herbal.notes != null && herbal.notes!.isNotEmpty)
+                      Text('Notes: ${herbal.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),
+                    const SizedBox(height: 4),
+                    CommentSection(targetId: herbal.id),
+                  ],
+                ),
+              ),
+            )).toList(),
+          );
+        } else if (title == 'Medications') {
+          final meds = healthData.medications.where((m) => m.patientId == patientId).toList();
+          if (meds.isEmpty) return const Text('No medications prescribed.');
+          return ListView(
+            shrinkWrap: true,
+            children: meds.map((med) => ListTile(
+              title: Text(med.name),
+              subtitle: Text('${med.dosage} - ${med.frequency}'),
+            )).toList(),
+          );
+        } else if (title == 'Adherence') {
+          final meds = healthData.medications.where((m) => m.patientId == patientId).toList();
+          final doseLogs = healthData.doseLogs.where((d) => meds.any((m) => m.id == d.medicationId)).toList();
+          final adherence = doseLogs.isEmpty ? 0.0 : (doseLogs.where((log) => log.taken).length / doseLogs.length) * 100;
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text('Adherence: ${adherence.toStringAsFixed(0)}%'),
+          );
+        }
+        return const SizedBox();
+      },
     );
   }
 
   Widget _buildDrugInteractionPreview(BuildContext context) {
-    // Always show sample antacid medications for demo
-    final medications = [
-      Medication(
-        id: '1',
-        name: 'Aluminium Hydroxide',
-        dosage: '400mg',
-        frequency: 'Three times daily',
-        times: ['08:00', '14:00', '20:00'],
-        instructions: 'Take after meals',
-        startDate: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-      Medication(
-        id: '2',
-        name: 'Calcium Carbonate',
-        dosage: '500mg',
-        frequency: 'As needed',
-        times: ['12:00'],
-        instructions: 'Take for heartburn relief',
-        startDate: DateTime.now().subtract(const Duration(days: 25)),
-      ),
-      Medication(
-        id: '3',
-        name: 'Magnesium Hydroxide',
-        dosage: '400mg',
-        frequency: 'Twice daily',
-        times: ['08:00', '20:00'],
-        instructions: 'Take with water',
-        startDate: DateTime.now().subtract(const Duration(days: 20)),
-      ),
-      Medication(
-        id: '4',
-        name: 'Sodium Bicarbonate',
-        dosage: '650mg',
-        frequency: 'As needed',
-        times: ['12:00'],
-        instructions: 'Dissolve in water before taking',
-        startDate: DateTime.now().subtract(const Duration(days: 15)),
-      ),
-      Medication(
-        id: '5',
-        name: 'Combination Antacid',
-        dosage: '1 tablet',
-        frequency: 'Four times daily',
-        times: ['08:00', '12:00', '18:00', '22:00'],
-        instructions: 'Chew thoroughly before swallowing',
-        startDate: DateTime.now().subtract(const Duration(days: 10)),
-      ),
-    ];
-
-    // Build graph data
-    final nodes = medications.map((med) => DrugNode(
-          id: med.id,
-          name: med.name,
-          category: _getDrugCategory(med.name),
-        )).toList();
-
-    final interactions = <DrugInteraction>[];
-    for (int i = 0; i < medications.length; i++) {
-      for (int j = i + 1; j < medications.length; j++) {
-        final interaction = _checkInteraction(medications[i], medications[j]);
-        if (interaction != null) {
-          interactions.add(interaction);
-        }
-      }
-    }
-
-    final graph = DrugInteractionGraph(nodes: nodes, interactions: interactions);
-    final hasHighRisk = interactions.any(
-        (i) => i.severity == InteractionSeverity.high || i.severity == InteractionSeverity.contraindicated);
-
-    return Card(
-      elevation: 4,
-      color: hasHighRisk ? Colors.red.shade50 : null,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Consumer<HealthDataProvider>(
+      builder: (context, healthData, child) {
+        final medications = healthData.medications;
+        return Card(
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  hasHighRisk ? Icons.warning : Icons.medication,
-                  color: hasHighRisk ? Colors.red : Theme.of(context).primaryColor,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Drug Interactions (Sample Antacids)',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('View All'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 200,
-              child: DrugInteractionGraphWidget(
-                graph: graph,
-                primaryColor: Theme.of(context).primaryColor,
-              ),
-            ),
-            if (hasHighRisk) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
+                Row(
                   children: [
-                    Icon(Icons.priority_high, color: Colors.red.shade700),
+                    Icon(Icons.medication, color: Theme.of(context).primaryColor),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '${interactions.where((i) => i.severity == InteractionSeverity.high || i.severity == InteractionSeverity.contraindicated).length} high-risk interactions detected',
-                        style: TextStyle(
-                          color: Colors.red.shade700,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        'Drug Interactions',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ],
-        ),
-      ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.search),
+                  label: const Text('Check for Interactions'),
+                  onPressed: () {
+                    final List<String> interactions = [];
+                    for (int i = 0; i < medications.length; i++) {
+                      for (int j = i + 1; j < medications.length; j++) {
+                        final interaction = _checkInteraction(medications[i], medications[j]);
+                        if (interaction != null) {
+                          interactions.add('Drug ${medications[i].name} interacts with Drug ${medications[j].name}');
+                        }
+                      }
+                    }
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Drug Interactions'),
+                        content: interactions.isEmpty
+                            ? const Text('No interactions detected among prescribed drugs.')
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: interactions.map((e) => Text(e)).toList(),
+                              ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  String _getDrugCategory(String drugName) {
-    final name = drugName.toLowerCase();
+  String _getAntacidType(String name) {
     if (name.contains('aluminium hydroxide')) {
       return 'Aluminium Hydroxide';
     } else if (name.contains('magnesium hydroxide')) {
       return 'Magnesium Hydroxide';
     } else if (name.contains('calcium carbonate')) {
-      return 'Calcium Carbonate';
     } else if (name.contains('sodium bicarbonate')) {
       return 'Sodium Bicarbonate';
     } else if (name.contains('combination antacid')) {
@@ -525,6 +556,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         name.contains('antibiotic');
   }
 
+  User? _selectedPatient;
   Widget _buildPatientList(BuildContext context) {
     if (_isLoadingPatients) {
       return const Center(
@@ -535,75 +567,143 @@ class _DashboardContentState extends State<_DashboardContent> {
       );
     }
 
-    if (_patients.isEmpty) {
-      return Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            children: [
-              Icon(
-                Icons.people_outline,
-                size: 48,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No patients yet',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.grey[600],
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButton<User>(
+                    isExpanded: true,
+                    value: _selectedPatient,
+                    hint: const Text('Select a patient'),
+                    items: _patients.map((patient) {
+                      return DropdownMenuItem<User>(
+                        value: patient,
+                        child: Text(patient.name),
+                      );
+                    }).toList(),
+                    onChanged: (user) {
+                      setState(() {
+                        _selectedPatient = user;
+                        if (user != null) {
+                          Provider.of<HealthDataProvider>(context, listen: false)
+                              .initializeForUser(user.id);
+                        }
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Add New'),
+                  onPressed: () async {
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final currentUser = authProvider.currentUser;
+                    if (currentUser == null) return;
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AddPatientScreen(
+                          clinicianId: currentUser.id,
+                          onPatientAdded: (user) async {
+                            await _loadPatients();
+                            setState(() {
+                              _selectedPatient = user;
+                            });
+                            if (mounted) {
+                              Provider.of<HealthDataProvider>(context, listen: false)
+                                  .initializeForUser(user.id);
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_selectedPatient != null)
+              _buildPatientCard(context, _selectedPatient!),
+            if (_patients.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 16.0),
+                child: Text(
+                  'No patients yet. Add a new patient to get started.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey[500],
+                      ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Patients who select you as their doctor will appear here.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[500],
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+          ],
         ),
-      );
-    }
-
-    return Column(
-      children: _patients.map((patient) => _buildPatientCard(context, patient)).toList(),
+      ),
     );
   }
 
   Widget _buildPatientCard(BuildContext context, User patient) {
-    // Navigate to patient details screen to view/add prescriptions
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).primaryColor,
-          child: Text(
-            patient.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase(),
-            style: const TextStyle(color: Colors.white),
+    return Consumer<HealthDataProvider>(
+      builder: (context, healthData, child) {
+        // Filter data for this patient
+        final meds = healthData.medications.where((m) => m.patientId == patient.id).toList();
+        final herbal = healthData.herbalUses;
+        final doseLogs = healthData.doseLogs;
+        final adherence = doseLogs.isEmpty ? 0.0 :
+          (doseLogs.where((log) => log.taken).length / doseLogs.length) * 100;
+        // Medication pattern: show times/frequency summary
+        String pattern = meds.isNotEmpty
+          ? meds.map((m) => '${m.name}: ${m.frequency}').join(', ')
+          : 'No medications';
+        // Herbal use summary
+        String herbalSummary = herbal.isNotEmpty
+          ? herbal.map((h) => h.name).join(', ')
+          : 'None';
+        return Card(
+          elevation: 2,
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ),
-        title: Text(patient.name),
-        subtitle: Text(patient.email),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PatientDetailsScreen(patient: patient),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Theme.of(context).primaryColor,
+              child: Text(
+                patient.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase(),
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
-          );
-        },
-      ),
+            title: Text(patient.name),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(patient.email),
+                const SizedBox(height: 4),
+                Text('Adherence: ${adherence.toStringAsFixed(0)}%'),
+                Text('Pattern: $pattern'),
+                Text('Herbal drugs: $herbalSummary'),
+              ],
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PatientDetailsScreen(patient: patient),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

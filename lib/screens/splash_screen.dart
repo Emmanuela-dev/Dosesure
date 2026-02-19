@@ -19,30 +19,34 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuth() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final healthProvider = Provider.of<HealthDataProvider>(context, listen: false);
-    
-    // Initialize auth state listener
-    authProvider.initAuthStateListener();
-    
-    // Load clinicians for registration
-    await authProvider.loadClinicians();
-    
-    // Load user if exists
-    await authProvider.loadUser();
-    
-    // Initialize health data for logged-in user
-    if (authProvider.currentUser != null) {
-      healthProvider.initializeForUser(authProvider.currentUser!.id);
-    }
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final healthProvider = Provider.of<HealthDataProvider>(context, listen: false);
+      
+      authProvider.initAuthStateListener();
+      
+      await authProvider.loadClinicians();
+      await authProvider.loadUser();
+      
+      if (authProvider.currentUser != null) {
+        healthProvider.initializeForUser(authProvider.currentUser!.id);
+      }
 
-    // Simulate loading time
-    await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(const Duration(seconds: 2));
 
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Splash screen error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+        );
+      }
     }
   }
 

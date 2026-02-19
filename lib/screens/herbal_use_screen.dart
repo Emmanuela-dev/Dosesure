@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/herbal_use.dart';
+import '../widgets/comment_section.dart';
 
 class HerbalUseScreen extends StatefulWidget {
   const HerbalUseScreen({super.key});
@@ -274,6 +275,10 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 8),
+            // Doctor/clinician comments section
+            if (herbal.id.isNotEmpty)
+              CommentSection(targetId: herbal.id),
           ],
         ),
       ),

@@ -52,7 +52,7 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('AuthProvider.loadClinicians - Error: $e');
-      rethrow;
+      _clinicians = [];
     }
   }
 
