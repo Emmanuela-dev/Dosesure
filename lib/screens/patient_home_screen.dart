@@ -9,6 +9,7 @@ import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
+import '../services/medication_expiry_service.dart';
 import 'medication_list_screen.dart';
 import 'side_effects_screen.dart';
 import 'herbal_use_screen.dart';
@@ -24,6 +25,41 @@ class PatientHomeScreen extends StatefulWidget {
 }
 
 class _PatientHomeScreenState extends State<PatientHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkExpiredMedications();
+    });
+  }
+
+  Future<void> _checkExpiredMedications() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userId = authProvider.currentUser?.id;
+      if (userId == null) return;
+
+      final expiredMeds = await MedicationExpiryService().checkAndDeactivateExpiredMedications(userId);
+      
+      if (expiredMeds.isNotEmpty && mounted) {
+        final healthData = Provider.of<HealthDataProvider>(context, listen: false);
+        healthData.initializeForUser(userId);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${expiredMeds.length} medication(s) have expired and been removed'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking expired medications: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final today = DateFormat('EEEE, MMMM d').format(DateTime.now());
@@ -187,7 +223,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.medication_outlined,
                     size: 48,
                     color: Colors.grey,
@@ -218,11 +254,16 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
   }
 
   Widget _buildMedicationCardFromModel(Medication med) {
+    final expiryService = MedicationExpiryService();
+    final daysRemaining = expiryService.getDaysRemaining(med);
+    final isExpiringSoon = daysRemaining >= 0 && daysRemaining <= 2;
+    
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
+        side: isExpiringSoon ? BorderSide(color: Colors.orange, width: 2) : BorderSide.none,
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -261,6 +302,23 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                     ],
                   ),
                 ),
+                if (daysRemaining >= 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isExpiringSoon ? Colors.orange : Colors.blue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      daysRemaining == 0 ? 'Last day' : '$daysRemaining days left',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -621,8 +679,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       statusText = 'Taken';
     } else if (isUpcoming) {
       statusColor = Colors.orange;
-      statusIcon = Icons.access_time;
-      statusText = 'Upcoming';
+      statusIcon = Icons.notifications_active;
+      statusText = 'Time to take!';
     } else if (isPast) {
       statusColor = Colors.red;
       statusIcon = Icons.cancel;
@@ -636,30 +694,49 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: isUpcoming && !isTaken
-          ? ElevatedButton(
-              onPressed: () => _confirmDoseIntake(medication, time, healthData),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: statusColor,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
+          ? Card(
+              elevation: 4,
+              color: statusColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Confirm $time dose',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Colors.white,
-                    ),
+              child: InkWell(
+                onTap: () => _confirmDoseIntake(medication, time, healthData),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.touch_app, color: Colors.white, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'TAP TO CONFIRM',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.white,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$time - ${medication.dosage}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 20),
+                    ],
                   ),
-                  const Spacer(),
-                  const Icon(Icons.touch_app, color: Colors.white, size: 18),
-                ],
+                ),
               ),
             )
           : Container(
@@ -730,7 +807,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.notifications, color: Colors.blue),
+            const Icon(Icons.notifications, color: Colors.blue),
             const SizedBox(width: 8),
             const Text('Notifications'),
           ],

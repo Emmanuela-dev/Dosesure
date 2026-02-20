@@ -223,6 +223,39 @@ class FirestoreService {
             .toList());
   }
 
+  // Get medications for a user (Future-based)
+  Future<List<Medication>> getMedicationsForUserFuture(String userId) async {
+    try {
+      final snapshot = await _medicationsCollection
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .get();
+      
+      return snapshot.docs
+          .map((doc) => Medication.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id,
+              }))
+          .toList();
+    } catch (e) {
+      debugPrint('getMedicationsForUserFuture - Error: $e');
+      // Fallback without orderBy
+      final snapshot = await _medicationsCollection
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      final medications = snapshot.docs
+          .map((doc) => Medication.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id,
+              }))
+          .toList();
+      
+      medications.sort((a, b) => b.startDate.compareTo(a.startDate));
+      return medications;
+    }
+  }
+
   // Get active medications for a user
   Stream<List<Medication>> getActiveMedicationsForUser(String userId) {
     return _medicationsCollection

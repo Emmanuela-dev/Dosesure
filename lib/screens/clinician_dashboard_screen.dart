@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/firestore_service.dart';
+import '../services/medication_expiry_service.dart';
 import '../models/user.dart';
 import 'clinician_patients_screen.dart';
 import 'clinician_reports_screen.dart';
@@ -152,6 +153,12 @@ class _DashboardContentState extends State<_DashboardContent> {
     if (currentUser != null && currentUser.role == UserRole.clinician) {
       try {
         final patients = await _firestoreService.getPatientsForClinician(currentUser.id);
+        
+        // Check and deactivate expired medications for all patients
+        for (final patient in patients) {
+          await MedicationExpiryService().checkAndDeactivateExpiredMedications(patient.id);
+        }
+        
         if (mounted) {
           setState(() {
             _patients = patients;
@@ -240,7 +247,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           return const SizedBox.shrink();
         }
         final patientId = _selectedPatient!.id;
-        final medications = healthData.medications.where((m) => m.patientId == patientId).toList();
+        final medications = healthData.medications.where((m) => m.patientId == patientId && m.isActive).toList();
         final sideEffects = healthData.sideEffects.where((s) => medications.any((m) => m.id == s.medicationId)).toList();
         final herbalUses = healthData.herbalUses;
         final doseLogs = healthData.doseLogs.where((d) => medications.any((m) => m.id == d.medicationId)).toList();
@@ -398,8 +405,8 @@ class _DashboardContentState extends State<_DashboardContent> {
             )).toList(),
           );
         } else if (title == 'Medications') {
-          final meds = healthData.medications.where((m) => m.patientId == patientId).toList();
-          if (meds.isEmpty) return const Text('No medications prescribed.');
+          final meds = healthData.medications.where((m) => m.patientId == patientId && m.isActive).toList();
+          if (meds.isEmpty) return const Text('No active medications prescribed.');
           return ListView(
             shrinkWrap: true,
             children: meds.map((med) => ListTile(
@@ -653,8 +660,8 @@ class _DashboardContentState extends State<_DashboardContent> {
   Widget _buildPatientCard(BuildContext context, User patient) {
     return Consumer<HealthDataProvider>(
       builder: (context, healthData, child) {
-        // Filter data for this patient
-        final meds = healthData.medications.where((m) => m.patientId == patient.id).toList();
+        // Filter data for this patient - only active medications
+        final meds = healthData.medications.where((m) => m.patientId == patient.id && m.isActive).toList();
         final herbal = healthData.herbalUses;
         final doseLogs = healthData.doseLogs;
         final adherence = doseLogs.isEmpty ? 0.0 :
@@ -662,7 +669,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         // Medication pattern: show times/frequency summary
         String pattern = meds.isNotEmpty
           ? meds.map((m) => '${m.name}: ${m.frequency}').join(', ')
-          : 'No medications';
+          : 'No active medications';
         // Herbal use summary
         String herbalSummary = herbal.isNotEmpty
           ? herbal.map((h) => h.name).join(', ')

@@ -91,10 +91,14 @@ class NotificationService {
       return;
     }
 
-    // Skip if medication has ended
-    if (medication.endDate != null && medication.endDate!.isBefore(DateTime.now())) {
-      debugPrint('Medication ${medication.name} has ended, skipping reminders');
-      return;
+    // Skip if medication has ended (check if endDate has passed)
+    if (medication.endDate != null) {
+      final now = DateTime.now();
+      final endOfDay = DateTime(medication.endDate!.year, medication.endDate!.month, medication.endDate!.day, 23, 59, 59);
+      if (now.isAfter(endOfDay)) {
+        debugPrint('Medication ${medication.name} has ended on ${medication.endDate}, skipping reminders');
+        return;
+      }
     }
 
     // Schedule notification for each time
