@@ -21,7 +21,7 @@ class RoleSelectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               Text(
-                'Welcome to DoseSure',
+                'Welcome to DawaTrack',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),

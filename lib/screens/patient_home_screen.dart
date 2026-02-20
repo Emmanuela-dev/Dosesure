@@ -68,8 +68,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       builder: (context, authProvider, child) {
         final userName = authProvider.currentUser?.name ?? '';
         final firstName = userName.isNotEmpty && userName != 'User' 
-            ? userName.split(' ').first 
-            : '';
+          ? userName.split(' ').first 
+          : '';
         final greeting = DateTime.now().hour < 12 ? 'morning' : DateTime.now().hour < 17 ? 'afternoon' : 'evening';
 
         return Scaffold(
@@ -137,9 +137,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                firstName.isNotEmpty
-                    ? 'Good $greeting, $firstName!'
-                    : 'Good $greeting!',
+                'Good $greeting, ${firstName.isNotEmpty ? firstName : userName}!',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),

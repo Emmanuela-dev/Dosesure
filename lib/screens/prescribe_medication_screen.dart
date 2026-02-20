@@ -22,6 +22,7 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
   final _dosageController = TextEditingController();
   final _frequencyController = TextEditingController();
   final _instructionsController = TextEditingController();
+  final _durationController = TextEditingController();
   final List<String> _times = [];
   bool _isSaving = false;
   bool _isLoadingDrugs = true;
@@ -71,6 +72,7 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
     _dosageController.dispose();
     _frequencyController.dispose();
     _instructionsController.dispose();
+    _durationController.dispose();
     super.dispose();
   }
 
@@ -125,6 +127,16 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
       medicationName = _nameController.text.trim();
     }
 
+    // Calculate end date from duration
+    DateTime? endDate;
+    final durationText = _durationController.text.trim();
+    if (durationText.isNotEmpty) {
+      final durationDays = int.tryParse(durationText);
+      if (durationDays != null) {
+        endDate = DateTime.now().add(Duration(days: durationDays));
+      }
+    }
+
     final medication = Medication(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: medicationName,
@@ -133,6 +145,7 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
       times: _times,
       instructions: _instructionsController.text.trim(),
       startDate: DateTime.now(),
+      endDate: endDate,
       prescribedBy: doctor.id,
       prescribedByName: doctor.name,
       patientId: widget.patient.id,
@@ -455,6 +468,26 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                     }).toList(),
                   ),
                 const SizedBox(height: 24),
+                TextFormField(
+                  controller: _durationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Duration (days)',
+                    prefixIcon: Icon(Icons.calendar_today),
+                    hintText: 'e.g., 7, 14, 30',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter duration in days';
+                    }
+                    if (int.tryParse(value) == null) {
+                      return 'Please enter a valid number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _instructionsController,
                   decoration: const InputDecoration(

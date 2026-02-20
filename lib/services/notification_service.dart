@@ -106,10 +106,21 @@ class NotificationService {
       final time = medication.times[i];
       final notificationId = _generateNotificationId(medication.id, i);
       
+      // Format time for display (e.g., "12:20 PM")
+      final timeParts = _parseTime(time);
+      String displayTime = time;
+      if (timeParts != null) {
+        final hour = timeParts['hour']!;
+        final minute = timeParts['minute']!;
+        final period = hour >= 12 ? 'PM' : 'AM';
+        final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+        displayTime = '$displayHour:${minute.toString().padLeft(2, '0')} $period';
+      }
+      
       await _scheduleDaily(
         id: notificationId,
-        title: '💊 Time to take your medication',
-        body: '${medication.name} - ${medication.dosage}\n${medication.instructions}',
+        title: '💊 Confirm dose $displayTime',
+        body: '${medication.name} - ${medication.dosage}',
         time: time,
         payload: medication.id,
       );
@@ -137,6 +148,10 @@ class NotificationService {
 
     // Get the next occurrence of this time
     final scheduledDate = _nextInstanceOfTime(hour, minute);
+    
+    // Format date for display (e.g., "21/02/2026")
+    final dateStr = '${scheduledDate.day.toString().padLeft(2, '0')}/${scheduledDate.month.toString().padLeft(2, '0')}/${scheduledDate.year}';
+    final bodyWithDate = '$body\nDate: $dateStr';
 
     const androidDetails = AndroidNotificationDetails(
       'medication_reminders',
@@ -164,7 +179,7 @@ class NotificationService {
     await _notifications.zonedSchedule(
       id,
       title,
-      body,
+      bodyWithDate,
       scheduledDate,
       notificationDetails,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,

@@ -160,7 +160,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Join DoseSure to manage your health',
+                  'Join DawaTrack to manage your health',
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
