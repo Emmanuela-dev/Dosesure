@@ -30,10 +30,14 @@ DawaTrack bridges the gap between patients and healthcare providers by offering 
 - **Permission Management**: Runtime permission requests for alarms and notifications
 
 #### 📊 Health Tracking
-- **Adherence Monitoring**: Track your medication compliance percentage
+- **Dual Adherence Metrics**: 
+  - **Self-Reported Adherence**: Quick button-click confirmation (may overestimate by 20-30%)
+  - **Verified Adherence**: Photo-confirmed doses for clinical accuracy
+- **Research-Backed Approach**: Acknowledges self-report bias documented in medical literature
+- **Photo Verification**: Optional camera capture of medication/blister pack for objective evidence
 - **Side Effects Reporting**: Log and monitor side effects from medications
 - **Herbal Medicine Tracking**: Record herbal supplements and traditional medicines
-- **Medication History**: View complete history of doses taken
+- **Medication History**: View complete history of doses taken with verification status
 
 #### 🔐 User Account
 - **Secure Authentication**: Firebase-based login system
@@ -67,7 +71,10 @@ DawaTrack bridges the gap between patients and healthcare providers by offering 
   - ⛔ **Contraindicated**: Do not combine these medications
 
 #### 📈 Monitoring & Analytics
-- **Adherence Tracking**: Monitor patient medication compliance
+- **Dual Adherence Tracking**: View both self-reported and verified adherence rates
+- **Research-Informed**: Understand the 20-30% overestimation bias in self-reports
+- **Photo Verification Review**: Access patient-submitted medication photos
+- **Clinical Decision Support**: Use verified adherence for treatment decisions
 - **Alert System**: Notifications for high-risk drug interactions
 - **Patient Reports**: Detailed reports on medication compliance and side effects
 
@@ -142,8 +149,10 @@ android/
 4. **Confirm Doses**: 
    - Wait for medication time (shows orange "Upcoming" 30 minutes before)
    - Click "Confirm [time] dose" button
+   - Choose to add photo verification (recommended) or skip
+   - Photo verification provides accurate adherence data for your doctor
    - System records intake and schedules next alarm
-5. **Track Progress**: Monitor adherence percentage in Health Summary
+5. **Track Progress**: Monitor both self-reported and verified adherence in Health Summary
 6. **Report Issues**: Use "Side Effects" to log any adverse reactions
 
 ### For Clinicians
@@ -160,8 +169,9 @@ android/
    - Add instructions
    - Set start/end dates
    - Save prescription
-4. **Monitor Adherence**: Check patient compliance rates
-5. **Review Interactions**: View drug interaction graph for safety
+4. **Monitor Adherence**: Check patient self-reported and verified compliance rates
+5. **Review Photo Proofs**: View patient-submitted medication photos for verification
+6. **Review Interactions**: View drug interaction graph for safety
 
 ## 🔒 Security & Privacy
 
@@ -218,8 +228,10 @@ Clinician → Prescribe Screen → FirestoreService.addMedication()
 
 ### Dose Confirmation Flow
 ```
-Patient → Confirm Button → _confirmDoseIntake() 
-→ Create DoseIntake & DoseLog → FirestoreService.recordDoseIntake() 
+Patient → Confirm Button → Photo Option Dialog
+→ [Optional] Camera Capture → Upload to Firebase Storage
+→ Create DoseIntake & DoseLog (with photo URL & verification status)
+→ FirestoreService.recordDoseIntake() 
 → HealthDataProvider.logDose() → NotificationService.scheduleMedicationReminders() 
 → Calculate Next Dose Time → Schedule New Alarm → Show Confirmation
 ```
@@ -235,6 +247,9 @@ Patient → Confirm Button → _confirmDoseIntake()
 
 ## 🚧 Future Enhancements
 
+- [ ] AI-powered medication recognition from photos
+- [ ] Blister pack pill counting from photos
+- [ ] Smart pill bottle integration
 - [ ] Multi-language support
 - [ ] Dark mode
 - [ ] Medication refill reminders
@@ -246,4 +261,14 @@ Patient → Confirm Button → _confirmDoseIntake()
 - [ ] Wearable device support
 - [ ] Telemedicine integration
 - [ ] AI-powered adherence predictions
+
+## 📚 Research & Methodology
+
+For detailed information about our adherence measurement approach and the research backing our dual-tracking system, see [ADHERENCE_METHODOLOGY.md](ADHERENCE_METHODOLOGY.md).
+
+### Key Points:
+- Self-reported adherence typically overestimates by 20-30% (Shi et al., 2010)
+- Photo verification provides objective evidence for clinical decisions
+- Both metrics displayed to educate patients and clinicians
+- Transparent about measurement limitations
 

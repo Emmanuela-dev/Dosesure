@@ -4,10 +4,12 @@ import '../models/user.dart';
 import '../models/drug.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/drug_database_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final FirebaseAuthService _authService = FirebaseAuthService();
   final FirestoreService _firestoreService = FirestoreService();
+  final DrugDatabaseService _drugDatabaseService = DrugDatabaseService();
   
   User? _currentUser;
   List<User> _clinicians = [];
@@ -77,12 +79,9 @@ class AuthProvider with ChangeNotifier {
   // Load drugs from Firestore
   Future<void> loadDrugs() async {
     try {
-      debugPrint('AuthProvider.loadDrugs - Loading drugs from Firestore...');
-      _drugs = await _firestoreService.getAllDrugs();
+      debugPrint('AuthProvider.loadDrugs - Loading drugs from database...');
+      _drugs = await _drugDatabaseService.getAllDrugs();
       debugPrint('AuthProvider.loadDrugs - Loaded ${_drugs.length} drugs');
-      for (final drug in _drugs) {
-        debugPrint('AuthProvider.loadDrugs - Drug: ${drug.name} (${drug.category})');
-      }
       notifyListeners();
     } catch (e) {
       debugPrint('AuthProvider.loadDrugs - Error: $e');
@@ -94,12 +93,12 @@ class AuthProvider with ChangeNotifier {
   Future<void> initializeDefaultDrugs() async {
     try {
       debugPrint('AuthProvider.initializeDefaultDrugs - Starting initialization...');
-      await _firestoreService.initializeDefaultDrugs();
-      // Reload drugs after initialization
+      await _drugDatabaseService.initializeDrugDatabase();
       await loadDrugs();
-      debugPrint('AuthProvider.initializeDefaultDrugs - Complete');
+      debugPrint('AuthProvider.initializeDefaultDrugs - Complete with ${_drugs.length} drugs');
     } catch (e) {
       debugPrint('AuthProvider.initializeDefaultDrugs - Error: $e');
+      rethrow;
     }
   }
 

@@ -5,6 +5,8 @@ class DoseIntake {
   final DateTime takenAt;
   final String scheduledTime;
   final DateTime nextDueTime;
+  final String? photoProofUrl;
+  final bool isVerified;
 
   DoseIntake({
     required this.id,
@@ -13,6 +15,8 @@ class DoseIntake {
     required this.takenAt,
     required this.scheduledTime,
     required this.nextDueTime,
+    this.photoProofUrl,
+    this.isVerified = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -23,6 +27,8 @@ class DoseIntake {
       'takenAt': takenAt.toIso8601String(),
       'scheduledTime': scheduledTime,
       'nextDueTime': nextDueTime.toIso8601String(),
+      'photoProofUrl': photoProofUrl,
+      'isVerified': isVerified,
     };
   }
 
@@ -34,6 +40,8 @@ class DoseIntake {
       takenAt: DateTime.parse(json['takenAt']),
       scheduledTime: json['scheduledTime'],
       nextDueTime: DateTime.parse(json['nextDueTime']),
+      photoProofUrl: json['photoProofUrl'],
+      isVerified: json['isVerified'] ?? false,
     );
   }
 }

@@ -8,6 +8,11 @@ class HerbalUse {
   final DateTime? endDate;
   final bool isActive;
   final String? notes;
+  final String? localName;
+  final String? botanicalGenus;
+  final String? photoUrl;
+  final String? preparationMethod;
+  final String? geographicOrigin;
 
   HerbalUse({
     required this.id,
@@ -19,6 +24,11 @@ class HerbalUse {
     this.endDate,
     this.isActive = true,
     this.notes,
+    this.localName,
+    this.botanicalGenus,
+    this.photoUrl,
+    this.preparationMethod,
+    this.geographicOrigin,
   });
 
   factory HerbalUse.fromJson(Map<String, dynamic> json) {
@@ -32,6 +42,11 @@ class HerbalUse {
       endDate: json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
       isActive: json['isActive'] ?? true,
       notes: json['notes'],
+      localName: json['localName'],
+      botanicalGenus: json['botanicalGenus'],
+      photoUrl: json['photoUrl'],
+      preparationMethod: json['preparationMethod'],
+      geographicOrigin: json['geographicOrigin'],
     );
   }
 
@@ -46,6 +61,11 @@ class HerbalUse {
       'endDate': endDate?.toIso8601String(),
       'isActive': isActive,
       'notes': notes,
+      'localName': localName,
+      'botanicalGenus': botanicalGenus,
+      'photoUrl': photoUrl,
+      'preparationMethod': preparationMethod,
+      'geographicOrigin': geographicOrigin,
     };
   }
 }

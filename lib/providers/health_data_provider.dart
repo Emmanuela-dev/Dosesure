@@ -251,6 +251,13 @@ class HealthDataProvider with ChangeNotifier {
     return (takenDoses / _doseLogs.length) * 100;
   }
 
+  // Get verified adherence percentage (photo-confirmed only)
+  double getVerifiedAdherencePercentage() {
+    if (_doseLogs.isEmpty) return 0.0;
+    final verifiedDoses = _doseLogs.where((log) => log.taken && log.isVerified).length;
+    return (verifiedDoses / _doseLogs.length) * 100;
+  }
+
   // Get adherence rate for date range
   Future<double> getAdherenceRate(String userId, DateTime start, DateTime end) async {
     try {

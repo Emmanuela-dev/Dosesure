@@ -30,6 +30,25 @@ class FirestoreService {
                     }))
                 .toList());
       }
+
+      // Get comments for a user (patient)
+      Stream<List<Comment>> getCommentsForUser(String userId) {
+        return _commentsCollection
+            .where('targetOwnerId', isEqualTo: userId)
+            .orderBy('createdAt', descending: true)
+            .snapshots()
+            .map((snapshot) => snapshot.docs
+                .map((doc) => Comment.fromJson({
+                      ...doc.data() as Map<String, dynamic>,
+                      'id': doc.id,
+                    }))
+                .toList());
+      }
+
+      // Mark comment as read
+      Future<void> markCommentAsRead(String commentId) async {
+        await _commentsCollection.doc(commentId).update({'isRead': true});
+      }
     // Add a new patient (auto-generate ID)
     Future<User> addPatient(User user, {String? doctorId}) async {
       final docRef = await _usersCollection.add({
@@ -573,33 +592,58 @@ class FirestoreService {
       final defaultDrugs = [
         Drug(
           id: 'magnesium_hydroxide',
+          genericName: 'Magnesium Hydroxide',
           name: 'Magnesium Hydroxide',
-          category: 'Antacid',
+          category: DrugCategory.antacid,
           description: 'Used for relief of heartburn, sour stomach, and indigestion',
+          isHighAlert: false,
+          commonDosages: [],
+          interactions: [],
+          warnings: '',
         ),
         Drug(
           id: 'calcium_carbonate',
+          genericName: 'Calcium Carbonate',
           name: 'Calcium Carbonate',
-          category: 'Antacid',
+          category: DrugCategory.antacid,
           description: 'Used as an antacid for heartburn and as a calcium supplement',
+          isHighAlert: false,
+          commonDosages: [],
+          interactions: [],
+          warnings: '',
         ),
         Drug(
           id: 'sodium_bicarbonate',
+          genericName: 'Sodium Bicarbonate',
           name: 'Sodium Bicarbonate',
-          category: 'Antacid',
+          category: DrugCategory.antacid,
           description: 'Used for relief of heartburn, indigestion, and sour stomach',
+          isHighAlert: false,
+          commonDosages: [],
+          interactions: [],
+          warnings: '',
         ),
         Drug(
           id: 'combination_antacid',
+          genericName: 'Combination Antacid',
           name: 'Combination Antacid',
-          category: 'Antacid',
+          category: DrugCategory.antacid,
           description: 'Combination of multiple antacids for enhanced relief',
+          isHighAlert: false,
+          commonDosages: [],
+          interactions: [],
+          warnings: '',
         ),
         Drug(
           id: 'aluminium_hydroxide',
+          genericName: 'Aluminium Hydroxide',
           name: 'Aluminium Hydroxide',
-          category: 'Antacid',
+          category: DrugCategory.antacid,
           description: 'Used to treat heartburn, peptic ulcers, and hyperphosphatemia',
+          isHighAlert: false,
+          commonDosages: [],
+          interactions: [],
+          warnings: '',
         ),
       ];
 

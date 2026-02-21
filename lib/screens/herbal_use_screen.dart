@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/herbal_use.dart';
+import '../services/photo_verification_service.dart';
 import '../widgets/comment_section.dart';
 
 class HerbalUseScreen extends StatefulWidget {
@@ -19,6 +21,12 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
   final _frequencyController = TextEditingController();
   final _purposeController = TextEditingController();
   final _notesController = TextEditingController();
+  final _localNameController = TextEditingController();
+  final _botanicalGenusController = TextEditingController();
+  final _preparationController = TextEditingController();
+  final _originController = TextEditingController();
+  XFile? _productPhoto;
+  bool _isUploading = false;
 
   @override
   void dispose() {
@@ -27,36 +35,89 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
     _frequencyController.dispose();
     _purposeController.dispose();
     _notesController.dispose();
+    _localNameController.dispose();
+    _botanicalGenusController.dispose();
+    _preparationController.dispose();
+    _originController.dispose();
     super.dispose();
+  }
+
+  Future<void> _captureProductPhoto() async {
+    try {
+      final photoService = PhotoVerificationService();
+      final photo = await photoService.capturePhoto();
+      if (photo != null) {
+        setState(() => _productPhoto = photo);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo captured successfully')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _addHerbalUse() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final herbalUse = HerbalUse(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameController.text.trim(),
-      dosage: _dosageController.text.trim(),
-      frequency: _frequencyController.text.trim(),
-      purpose: _purposeController.text.trim(),
-      startDate: DateTime.now(),
-      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-    );
+    setState(() => _isUploading = true);
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await Provider.of<HealthDataProvider>(context, listen: false)
-        .addHerbalUse(authProvider.currentUser!.id, herbalUse);
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userId = authProvider.currentUser!.id;
+      
+      String? photoUrl;
+      if (_productPhoto != null) {
+        final photoService = PhotoVerificationService();
+        photoUrl = await photoService.uploadPhoto(userId, 'herbal_${DateTime.now().millisecondsSinceEpoch}', _productPhoto!);
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Herbal use added successfully')),
-    );
+      final herbalUse = HerbalUse(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: _nameController.text.trim(),
+        dosage: _dosageController.text.trim(),
+        frequency: _frequencyController.text.trim(),
+        purpose: _purposeController.text.trim(),
+        startDate: DateTime.now(),
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        localName: _localNameController.text.trim().isEmpty ? null : _localNameController.text.trim(),
+        botanicalGenus: _botanicalGenusController.text.trim().isEmpty ? null : _botanicalGenusController.text.trim(),
+        preparationMethod: _preparationController.text.trim().isEmpty ? null : _preparationController.text.trim(),
+        geographicOrigin: _originController.text.trim().isEmpty ? null : _originController.text.trim(),
+        photoUrl: photoUrl,
+      );
 
-    // Clear form
-    _nameController.clear();
-    _dosageController.clear();
-    _frequencyController.clear();
-    _purposeController.clear();
-    _notesController.clear();
+      await Provider.of<HealthDataProvider>(context, listen: false)
+          .addHerbalUse(userId, herbalUse);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Herbal medicine added successfully')),
+        );
+      }
+
+      // Clear form
+      _nameController.clear();
+      _dosageController.clear();
+      _frequencyController.clear();
+      _purposeController.clear();
+      _notesController.clear();
+      _localNameController.clear();
+      _botanicalGenusController.clear();
+      _preparationController.clear();
+      _originController.clear();
+      setState(() => _productPhoto = null);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isUploading = false);
+    }
   }
 
   @override
@@ -150,6 +211,91 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'Scientific Identification',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Herbal compositions vary by geography and preparation. Provide local name and/or photo to help identify botanical genus.',
+                                style: TextStyle(fontSize: 11, color: Colors.blue.shade900),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _localNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Local/Common Name (Optional)',
+                            prefixIcon: Icon(Icons.language),
+                            hintText: 'e.g., Dawa ya tumbo',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _botanicalGenusController,
+                          decoration: const InputDecoration(
+                            labelText: 'Botanical Genus (Optional)',
+                            prefixIcon: Icon(Icons.science),
+                            hintText: 'e.g., Zingiber',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _preparationController,
+                          decoration: const InputDecoration(
+                            labelText: 'Preparation (Optional)',
+                            prefixIcon: Icon(Icons.blender),
+                            hintText: 'e.g., Tea, Powder',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _originController,
+                          decoration: const InputDecoration(
+                            labelText: 'Origin (Optional)',
+                            prefixIcon: Icon(Icons.location_on),
+                            hintText: 'e.g., Kenya',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          onPressed: _captureProductPhoto,
+                          icon: Icon(_productPhoto == null ? Icons.camera_alt : Icons.check_circle, 
+                            color: _productPhoto == null ? null : Colors.green),
+                          label: Text(_productPhoto == null ? 'Add Product Photo' : 'Photo Added'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
+                        ),
+                        if (_productPhoto != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              'Photo will help clinician identify the product',
+                              style: TextStyle(fontSize: 11, color: Colors.green.shade700),
+                            ),
+                          ),
+                        const SizedBox(height: 16),
                         TextFormField(
                           controller: _notesController,
                           decoration: const InputDecoration(
@@ -163,8 +309,14 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _addHerbalUse,
-                            child: const Text('Add Herbal Medicine'),
+                            onPressed: _isUploading ? null : _addHerbalUse,
+                            child: _isUploading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Add Herbal Medicine'),
                           ),
                         ),
                       ],
@@ -235,37 +387,57 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    herbal.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        herbal.name,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (herbal.localName != null)
+                        Text(
+                          'Local: ${herbal.localName}',
+                          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        ),
+                    ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () {
-                    // TODO: Edit herbal use
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, size: 20),
-                  onPressed: () {
-                    // TODO: Delete herbal use
-                  },
-                ),
+                if (herbal.photoUrl != null)
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(Icons.photo, size: 16, color: Colors.green.shade700),
+                  ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(
               '${herbal.dosage} - ${herbal.frequency}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 2),
             Text(
               'Purpose: ${herbal.purpose}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (herbal.botanicalGenus != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Genus: ${herbal.botanicalGenus}',
+                style: TextStyle(fontSize: 11, color: Colors.blue.shade700, fontStyle: FontStyle.italic),
+              ),
+            ],
+            if (herbal.preparationMethod != null || herbal.geographicOrigin != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                '${herbal.preparationMethod ?? ''} ${herbal.geographicOrigin != null ? '(${herbal.geographicOrigin})' : ''}',
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              ),
+            ],
             if (herbal.notes != null && herbal.notes!.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
@@ -276,9 +448,12 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            // Doctor/clinician comments section
-            if (herbal.id.isNotEmpty)
-              CommentSection(targetId: herbal.id),
+            if (herbal.id.isNotEmpty) Consumer<AuthProvider>(
+              builder: (context, auth, _) => CommentSection(
+                targetId: herbal.id,
+                targetOwnerId: auth.currentUser?.id ?? '',
+              ),
+            ),
           ],
         ),
       ),

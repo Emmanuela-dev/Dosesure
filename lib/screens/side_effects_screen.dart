@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/side_effect.dart';
 import '../models/medication.dart';
+import '../services/symptom_triage_service.dart';
 import '../widgets/comment_section.dart';
 
 class SideEffectsScreen extends StatefulWidget {
@@ -36,22 +38,45 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
       return;
     }
 
+    final description = _descriptionController.text.trim();
+    final triageLevel = SymptomTriage.classifySymptom(description);
+
+    // Show triage-based dialog
+    if (triageLevel == TriageLevel.emergency) {
+      await _showEmergencyDialog();
+      return; // Don't just log, require emergency action
+    } else if (triageLevel == TriageLevel.urgent) {
+      await _showUrgentDialog();
+    }
+
     final sideEffect = SideEffect(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       medicationId: _selectedMedicationId!,
-      description: _descriptionController.text.trim(),
+      description: description,
       severity: _severity,
       reportedDate: DateTime.now(),
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      triageLevel: triageLevel.name,
+      requiresEmergencyAction: triageLevel == TriageLevel.emergency,
+      clinicianNotified: triageLevel == TriageLevel.urgent || triageLevel == TriageLevel.emergency,
     );
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await Provider.of<HealthDataProvider>(context, listen: false)
         .addSideEffect(authProvider.currentUser!.id, sideEffect);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Side effect reported successfully')),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            triageLevel == TriageLevel.routine
+                ? 'Side effect reported to your healthcare provider'
+                : 'Report logged. Follow the guidance provided.',
+          ),
+          backgroundColor: triageLevel == TriageLevel.routine ? Colors.green : Colors.orange,
+        ),
+      );
+    }
 
     // Clear form
     _descriptionController.clear();
@@ -60,6 +85,117 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
       _selectedMedicationId = null;
       _severity = 1;
     });
+  }
+
+  Future<void> _showEmergencyDialog() async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.red.shade50,
+        title: Row(
+          children: [
+            Icon(Icons.emergency, color: Colors.red.shade700, size: 32),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'MEDICAL EMERGENCY',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              SymptomTriage.getEmergencyMessage(),
+              style: const TextStyle(fontSize: 15, height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade300, width: 2),
+              ),
+              child: const Text(
+                'This app does NOT replace emergency medical services. Your clinician will NOT be notified in real-time.',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton.icon(
+            onPressed: () async {
+              final uri = Uri(scheme: 'tel', path: '911');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+              if (context.mounted) Navigator.pop(context);
+            },
+            icon: const Icon(Icons.phone),
+            label: const Text('CALL 911'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('I understand'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showUrgentDialog() async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.orange.shade50,
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange.shade700, size: 28),
+            const SizedBox(width: 8),
+            const Text('Urgent Medical Attention'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              SymptomTriage.getUrgentMessage(),
+              style: const TextStyle(fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Your healthcare provider will be notified, but may not see this immediately. Contact them directly.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('I understand'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -90,6 +226,37 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
                           'Report a Side Effect',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.emergency, color: Colors.red.shade700, size: 20),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'Emergency Symptoms',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'If experiencing: difficulty breathing, chest pain, severe allergic reaction, seizures, loss of consciousness, or severe bleeding - CALL 911 IMMEDIATELY.',
+                                style: TextStyle(fontSize: 11, color: Colors.red.shade900),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -232,11 +399,19 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
   }
 
   Widget _buildSideEffectCard(BuildContext context, SideEffect effect, Medication medication) {
+    final isEmergency = effect.triageLevel == 'emergency';
+    final isUrgent = effect.triageLevel == 'urgent';
+    
     return Card(
-      elevation: 1,
+      elevation: isEmergency || isUrgent ? 4 : 1,
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
+        side: isEmergency 
+            ? BorderSide(color: Colors.red, width: 2)
+            : isUrgent
+                ? BorderSide(color: Colors.orange, width: 2)
+                : BorderSide.none,
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -246,7 +421,7 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
             Row(
               children: [
                 Icon(
-                  Icons.warning,
+                  isEmergency ? Icons.emergency : Icons.warning,
                   color: _getSeverityColor(effect.severity),
                   size: 20,
                 ),
@@ -259,6 +434,23 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
                     ),
                   ),
                 ),
+                if (isEmergency || isUrgent)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isEmergency ? Colors.red : Colors.orange,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      isEmergency ? 'EMERGENCY' : 'URGENT',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
                 Text(
                   '${effect.reportedDate.day}/${effect.reportedDate.month}',
                   style: Theme.of(context).textTheme.bodySmall,
@@ -280,9 +472,12 @@ class _SideEffectsScreenState extends State<SideEffectsScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            // Doctor/clinician comments section
-            if (effect.id.isNotEmpty)
-              CommentSection(targetId: effect.id),
+            if (effect.id.isNotEmpty) Consumer<AuthProvider>(
+              builder: (context, auth, _) => CommentSection(
+                targetId: effect.id,
+                targetOwnerId: auth.currentUser?.id ?? '',
+              ),
+            ),
           ],
         ),
       ),

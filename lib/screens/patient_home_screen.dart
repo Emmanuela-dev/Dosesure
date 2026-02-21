@@ -10,11 +10,14 @@ import '../providers/auth_provider.dart';
 import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
 import '../services/medication_expiry_service.dart';
+import '../services/photo_verification_service.dart';
+import '../widgets/clinician_comments_widget.dart';
 import 'medication_list_screen.dart';
 import 'side_effects_screen.dart';
 import 'herbal_use_screen.dart';
 import 'history_screen.dart';
 import 'adherence_screen.dart';
+import 'export_report_screen.dart';
 import 'role_selection_screen.dart';
 
 class PatientHomeScreen extends StatefulWidget {
@@ -85,7 +88,12 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.person),
             onSelected: (value) async {
-              if (value == 'logout') {
+              if (value == 'export') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ExportReportScreen()),
+                );
+              } else if (value == 'logout') {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -117,6 +125,16 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
+                value: 'export',
+                child: Row(
+                  children: [
+                    Icon(Icons.file_download, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('Export Report'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'logout',
                 child: Row(
                   children: [
@@ -147,7 +165,10 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                 today,
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+              if (authProvider.currentUser != null)
+                ClinicianCommentsWidget(userId: authProvider.currentUser!.id),
+              const SizedBox(height: 16),
               _buildQuickActions(),
               const SizedBox(height: 32),
               Text(
@@ -443,7 +464,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     return Consumer<HealthDataProvider>(
       builder: (context, healthData, child) {
         final medications = healthData.medications.where((m) => m.isActive).toList();
-        final adherence = healthData.getAdherencePercentage();
+        final selfReportedAdherence = healthData.getAdherencePercentage();
+        final verifiedAdherence = healthData.getVerifiedAdherencePercentage();
 
         return Card(
           elevation: 2,
@@ -466,10 +488,16 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _buildSummaryItem(
-                      'Adherence', 
-                      '${adherence.toStringAsFixed(0)}%', 
-                      adherence >= 80 ? Colors.green : adherence >= 60 ? Colors.orange : Colors.red,
-                      hasAlert: adherence < 60,
+                      'Self-Reported', 
+                      '${selfReportedAdherence.toStringAsFixed(0)}%', 
+                      selfReportedAdherence >= 80 ? Colors.green : selfReportedAdherence >= 60 ? Colors.orange : Colors.red,
+                      hasAlert: selfReportedAdherence < 60,
+                    ),
+                    _buildSummaryItem(
+                      'Verified', 
+                      '${verifiedAdherence.toStringAsFixed(0)}%', 
+                      verifiedAdherence >= 80 ? Colors.green : verifiedAdherence >= 60 ? Colors.orange : Colors.red,
+                      hasAlert: false,
                     ),
                     _buildSummaryItem(
                       'Medications', 
@@ -477,13 +505,31 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                       Colors.blue,
                       hasAlert: false,
                     ),
-                    _buildSummaryItem(
-                      'Side Effects', 
-                      '${healthData.sideEffects.length}', 
-                      healthData.sideEffects.length > 3 ? Colors.red : Colors.orange,
-                      hasAlert: healthData.sideEffects.length > 3,
-                    ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Research shows self-reported adherence may overestimate by 20-30%. Use photo verification for accuracy.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -894,7 +940,103 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     final userId = authProvider.currentUser?.id;
     if (userId == null) return;
 
+    // Show confirmation dialog with photo option
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Dose'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${medication.name} - ${medication.dosage}'),
+            const SizedBox(height: 16),
+            const Text(
+              'Add photo proof for verified adherence tracking?',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.verified, size: 14, color: Colors.blue.shade700),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Photo verification provides accurate adherence data',
+                      style: TextStyle(fontSize: 10, color: Colors.blue.shade900),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, {'withPhoto': false}),
+            child: const Text('Skip Photo'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, {'withPhoto': true}),
+            icon: const Icon(Icons.camera_alt, size: 18),
+            label: const Text('Take Photo'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return;
+
     await _requestAlarmPermissions();
+
+    String? photoUrl;
+    bool isVerified = false;
+
+    if (result['withPhoto'] == true) {
+      try {
+        final photoService = PhotoVerificationService();
+        final photo = await photoService.capturePhoto();
+        
+        if (photo != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    ),
+                    SizedBox(width: 12),
+                    Text('Uploading photo...'),
+                  ],
+                ),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          
+          photoUrl = await photoService.uploadPhoto(userId, medication.id, photo);
+          isVerified = true;
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Photo upload failed: $e'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    }
 
     final now = DateTime.now();
     final timeParts = time.split(':');
@@ -910,6 +1052,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       takenAt: now,
       scheduledTime: time,
       nextDueTime: nextDueTime,
+      photoProofUrl: photoUrl,
+      isVerified: isVerified,
     );
 
     final doseLog = DoseLog(
@@ -918,6 +1062,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       scheduledTime: DateTime(now.year, now.month, now.day, hour, minute),
       takenTime: now,
       taken: true,
+      photoProofUrl: photoUrl,
+      isVerified: isVerified,
     );
 
     try {
@@ -930,14 +1076,19 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.white),
+                Icon(
+                  isVerified ? Icons.verified : Icons.check_circle,
+                  color: Colors.white,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('${medication.name} dose confirmed!\nNext dose: ${DateFormat('MMM d, h:mm a').format(nextDueTime)}'),
+                  child: Text(
+                    '${medication.name} dose confirmed${isVerified ? ' with photo verification' : ' (self-reported)'}!\nNext dose: ${DateFormat('MMM d, h:mm a').format(nextDueTime)}',
+                  ),
                 ),
               ],
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: isVerified ? Colors.green : Colors.blue,
             duration: const Duration(seconds: 3),
           ),
         );

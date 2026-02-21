@@ -313,7 +313,19 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                             ...authProvider.drugs.map((drug) {
                               return DropdownMenuItem<Drug>(
                                 value: drug,
-                                child: Text(drug.name),
+                                child: Row(
+                                  children: [
+                                    if (drug.isHighAlert)
+                                      const Icon(Icons.warning, size: 16, color: Colors.red),
+                                    if (drug.isHighAlert) const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '${drug.name} (${drug.categoryDisplay})',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               );
                             }),
                           ],
@@ -367,6 +379,71 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                                   ),
                                 ],
                               ),
+                            ),
+                          ),
+                        if (_selectedDrug != null && _selectedDrug!.isHighAlert)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.red, width: 2),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.warning, size: 20, color: Colors.red),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'HIGH-ALERT MEDICATION',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red[900],
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _selectedDrug!.warnings,
+                                    style: TextStyle(
+                                      color: Colors.red[900],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  if (_selectedDrug!.interactions.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Interactions: ${_selectedDrug!.interactions.join(', ')}',
+                                      style: TextStyle(
+                                        color: Colors.red[700],
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        if (_selectedDrug != null && _selectedDrug!.commonDosages.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Wrap(
+                              spacing: 8,
+                              children: _selectedDrug!.commonDosages.map((dosage) {
+                                return ActionChip(
+                                  label: Text(dosage, style: const TextStyle(fontSize: 11)),
+                                  onPressed: () {
+                                    _dosageController.text = dosage;
+                                  },
+                                );
+                              }).toList(),
                             ),
                           ),
                       ],

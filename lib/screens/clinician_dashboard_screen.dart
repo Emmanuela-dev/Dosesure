@@ -5,6 +5,7 @@ import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/firestore_service.dart';
 import '../services/medication_expiry_service.dart';
+import '../services/report_export_service.dart';
 import '../models/user.dart';
 import 'clinician_patients_screen.dart';
 import 'clinician_reports_screen.dart';
@@ -241,55 +242,44 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   Widget _buildOverviewCards(BuildContext context) {
+    if (_selectedPatient == null) {
+      return Card(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Text(
+            'Select a patient to view overview',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
     return Consumer<HealthDataProvider>(
       builder: (context, healthData, child) {
-        if (_selectedPatient == null) {
-          return const SizedBox.shrink();
-        }
         final patientId = _selectedPatient!.id;
         final medications = healthData.medications.where((m) => m.patientId == patientId && m.isActive).toList();
-        final sideEffects = healthData.sideEffects.where((s) => medications.any((m) => m.id == s.medicationId)).toList();
+        final medIds = medications.map((m) => m.id).toSet();
+        final sideEffects = healthData.sideEffects.where((s) => medIds.contains(s.medicationId)).toList();
         final herbalUses = healthData.herbalUses;
-        final doseLogs = healthData.doseLogs.where((d) => medications.any((m) => m.id == d.medicationId)).toList();
-        final adherence = doseLogs.isEmpty ? '0' : ((doseLogs.where((d) => d.taken).length / doseLogs.length) * 100).toStringAsFixed(0);
+        final doseLogs = healthData.doseLogs.where((d) => medIds.contains(d.medicationId)).toList();
+        final selfReportedAdherence = doseLogs.isEmpty ? 0.0 : (doseLogs.where((d) => d.taken).length / doseLogs.length) * 100;
+        final verifiedAdherence = doseLogs.isEmpty ? 0.0 : (doseLogs.where((d) => d.taken && d.isVerified).length / doseLogs.length) * 100;
 
-        return Row(
+        return GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.5,
           children: [
-            Expanded(
-              child: _buildOverviewCard(
-                'Medications',
-                medications.length.toString(),
-                Icons.medication,
-                Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildOverviewCard(
-                'Side Effects',
-                sideEffects.length.toString(),
-                Icons.warning,
-                Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildOverviewCard(
-                'Herbal Use',
-                herbalUses.length.toString(),
-                Icons.grass,
-                Colors.green,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildOverviewCard(
-                'Adherence',
-                '$adherence%',
-                Icons.check_circle,
-                Colors.purple,
-              ),
-            ),
+            _buildOverviewCard('Medications', medications.length.toString(), Icons.medication, Colors.blue),
+            _buildOverviewCard('Side Effects', sideEffects.length.toString(), Icons.warning, Colors.orange),
+            _buildOverviewCard('Herbal Use', herbalUses.length.toString(), Icons.grass, Colors.green),
+            _buildOverviewCard('Self-Reported', '${selfReportedAdherence.toStringAsFixed(0)}%', Icons.check_circle, Colors.blueAccent),
+            _buildOverviewCard('Verified', '${verifiedAdherence.toStringAsFixed(0)}%', Icons.verified, Colors.teal),
+            _buildOverviewCard('Gap', '${(selfReportedAdherence - verifiedAdherence).abs().toStringAsFixed(0)}%', Icons.trending_down, Colors.red),
           ],
         );
       },
@@ -298,55 +288,60 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   Widget _buildOverviewCard(String title, String value, IconData icon, Color color) {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
           if (_selectedPatient == null) return;
           showDialog(
             context: context,
-            builder: (context) {
-              return AlertDialog(
-                title: Text(title),
-                content: SizedBox(
-                  width: 400,
-                  height: 500,
-                  child: _buildDetailListForCard(title, _selectedPatient!.id),
+            builder: (context) => AlertDialog(
+              title: Text(title),
+              content: SizedBox(
+                width: 400,
+                height: 500,
+                child: _buildDetailListForCard(title, _selectedPatient!.id),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Close'),
-                  ),
-                ],
-              );
-            },
+              ],
+            ),
           );
         },
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          padding: const EdgeInsets.all(12),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 32),
+              Icon(icon, color: color, size: 28),
               const SizedBox(height: 8),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 24,
+                style: TextStyle(
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
+                  color: color,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
+                style: const TextStyle(fontSize: 10, color: Colors.grey),
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -358,10 +353,12 @@ class _DashboardContentState extends State<_DashboardContent> {
   Widget _buildDetailListForCard(String title, String patientId) {
     return Consumer<HealthDataProvider>(
       builder: (context, healthData, child) {
+        final meds = healthData.medications.where((m) => m.patientId == patientId).toList();
+        final medIds = meds.map((m) => m.id).toSet();
+        
         if (title == 'Side Effects') {
-          final meds = healthData.medications.where((m) => m.patientId == patientId).toList();
-          final sideEffects = healthData.sideEffects.where((s) => meds.any((m) => m.id == s.medicationId)).toList();
-          if (sideEffects.isEmpty) return const Text('No side effects reported.');
+          final sideEffects = healthData.sideEffects.where((s) => medIds.contains(s.medicationId)).toList();
+          if (sideEffects.isEmpty) return const Center(child: Text('No side effects reported.'));
           return ListView(
             shrinkWrap: true,
             children: sideEffects.map((effect) => Card(
@@ -375,7 +372,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     if (effect.notes != null && effect.notes!.isNotEmpty)
                       Text('Notes: ${effect.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),
                     const SizedBox(height: 4),
-                    CommentSection(targetId: effect.id),
+                    CommentSection(targetId: effect.id, targetOwnerId: patientId),
                   ],
                 ),
               ),
@@ -383,7 +380,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           );
         } else if (title == 'Herbal Use') {
           final herbalUses = healthData.herbalUses;
-          if (herbalUses.isEmpty) return const Text('No herbal drug use reported.');
+          if (herbalUses.isEmpty) return const Center(child: Text('No herbal drug use reported.'));
           return ListView(
             shrinkWrap: true,
             children: herbalUses.map((herbal) => Card(
@@ -395,32 +392,67 @@ class _DashboardContentState extends State<_DashboardContent> {
                   children: [
                     Text(herbal.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                     Text('${herbal.dosage} - ${herbal.frequency}'),
+                    if (herbal.localName != null)
+                      Text('Local: ${herbal.localName}', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                    if (herbal.botanicalGenus != null)
+                      Text('Genus: ${herbal.botanicalGenus}', style: TextStyle(fontSize: 11, color: Colors.blue[700])),
                     if (herbal.notes != null && herbal.notes!.isNotEmpty)
                       Text('Notes: ${herbal.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),
                     const SizedBox(height: 4),
-                    CommentSection(targetId: herbal.id),
+                    CommentSection(targetId: herbal.id, targetOwnerId: patientId),
                   ],
                 ),
               ),
             )).toList(),
           );
         } else if (title == 'Medications') {
-          final meds = healthData.medications.where((m) => m.patientId == patientId && m.isActive).toList();
-          if (meds.isEmpty) return const Text('No active medications prescribed.');
+          final activeMeds = meds.where((m) => m.isActive).toList();
+          if (activeMeds.isEmpty) return const Center(child: Text('No active medications prescribed.'));
           return ListView(
             shrinkWrap: true,
-            children: meds.map((med) => ListTile(
-              title: Text(med.name),
-              subtitle: Text('${med.dosage} - ${med.frequency}'),
+            children: activeMeds.map((med) => Card(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              child: ListTile(
+                title: Text(med.name),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${med.dosage} - ${med.frequency}'),
+                    Text('Times: ${med.times.join(', ')}', style: const TextStyle(fontSize: 11)),
+                  ],
+                ),
+              ),
             )).toList(),
           );
-        } else if (title == 'Adherence') {
-          final meds = healthData.medications.where((m) => m.patientId == patientId).toList();
-          final doseLogs = healthData.doseLogs.where((d) => meds.any((m) => m.id == d.medicationId)).toList();
-          final adherence = doseLogs.isEmpty ? 0.0 : (doseLogs.where((log) => log.taken).length / doseLogs.length) * 100;
+        } else if (title == 'Self-Reported' || title == 'Verified') {
+          final doseLogs = healthData.doseLogs.where((d) => medIds.contains(d.medicationId)).toList();
+          final isVerified = title == 'Verified';
+          final relevantLogs = isVerified 
+              ? doseLogs.where((log) => log.taken && log.isVerified).toList()
+              : doseLogs.where((log) => log.taken).toList();
+          final adherence = doseLogs.isEmpty ? 0.0 : (relevantLogs.length / doseLogs.length) * 100;
+          
           return Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Text('Adherence: ${adherence.toStringAsFixed(0)}%'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$title Adherence: ${adherence.toStringAsFixed(1)}%',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text('Total doses: ${doseLogs.length}'),
+                Text('${isVerified ? 'Verified' : 'Confirmed'} doses: ${relevantLogs.length}'),
+                if (isVerified) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Verified doses have photo proof',
+                    style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ],
+            ),
           );
         }
         return const SizedBox();
@@ -500,6 +532,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     } else if (name.contains('magnesium hydroxide')) {
       return 'Magnesium Hydroxide';
     } else if (name.contains('calcium carbonate')) {
+      return 'Calcium Carbonate';
     } else if (name.contains('sodium bicarbonate')) {
       return 'Sodium Bicarbonate';
     } else if (name.contains('combination antacid')) {
@@ -564,6 +597,44 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   User? _selectedPatient;
+
+  Future<void> _generatePatientReport(BuildContext context, User patient) async {
+    try {
+      final healthData = Provider.of<HealthDataProvider>(context, listen: false);
+      final exportService = ReportExportService();
+      
+      final medications = healthData.medications.where((m) => m.patientId == patient.id).toList();
+      final doseLogs = healthData.doseLogs;
+      final sideEffects = healthData.sideEffects;
+      
+      final file = await exportService.generatePdfReport(
+        patientName: patient.name,
+        patientId: patient.id,
+        medications: medications,
+        doseLogs: doseLogs,
+        sideEffects: sideEffects,
+        selfReportedAdherence: healthData.getAdherencePercentage(),
+        verifiedAdherence: healthData.getVerifiedAdherencePercentage(),
+        startDate: DateTime.now().subtract(const Duration(days: 30)),
+        endDate: DateTime.now(),
+      );
+      
+      await exportService.shareReport(file, 'PDF');
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Patient report generated successfully')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Widget _buildPatientList(BuildContext context) {
     if (_isLoadingPatients) {
       return const Center(
@@ -641,6 +712,18 @@ class _DashboardContentState extends State<_DashboardContent> {
             const SizedBox(height: 16),
             if (_selectedPatient != null)
               _buildPatientCard(context, _selectedPatient!),
+            if (_selectedPatient != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: ElevatedButton.icon(
+                  onPressed: () => _generatePatientReport(context, _selectedPatient!),
+                  icon: const Icon(Icons.file_download),
+                  label: const Text('Generate Patient Report'),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+              ),
             if (_patients.isEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 16.0),
