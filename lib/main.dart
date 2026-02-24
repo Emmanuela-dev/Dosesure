@@ -7,7 +7,7 @@ import 'providers/health_data_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
 import 'services/notification_service.dart';
-import 'services/firestore_service.dart';
+import 'services/drug_database_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,8 +21,8 @@ void main() async {
     await NotificationService().initialize();
     debugPrint('Notification service initialized');
     
-    await FirestoreService().initializeDefaultDrugs();
-    debugPrint('Default drugs initialized');
+    await DrugDatabaseService().initializeDrugDatabase();
+    debugPrint('Drug database initialized');
   } catch (e, stackTrace) {
     debugPrint('Initialization error: $e');
     debugPrint('Stack trace: $stackTrace');

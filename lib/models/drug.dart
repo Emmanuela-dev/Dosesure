@@ -36,20 +36,35 @@ class Drug {
   });
 
   factory Drug.fromJson(Map<String, dynamic> json) {
-    return Drug(
-      id: json['id'],
-      name: json['name'],
-      genericName: json['genericName'] ?? json['name'],
-      category: DrugCategory.values.firstWhere(
-        (e) => e.name == json['category'],
-        orElse: () => DrugCategory.other,
-      ),
-      isHighAlert: json['isHighAlert'] ?? false,
-      commonDosages: List<String>.from(json['commonDosages'] ?? []),
-      interactions: List<String>.from(json['interactions'] ?? []),
-      warnings: json['warnings'] ?? '',
-      description: json['description'],
-    );
+    try {
+      // Ensure all required fields are present and not null
+      final id = json['id'];
+      final name = json['name'];
+      final category = json['category'];
+      
+      if (id == null) throw 'Missing required field: id';
+      if (name == null) throw 'Missing required field: name';
+      if (category == null) throw 'Missing required field: category';
+      
+      return Drug(
+        id: id.toString(),
+        name: name.toString(),
+        genericName: (json['genericName'] ?? name).toString(),
+        category: DrugCategory.values.firstWhere(
+          (e) => e.name == category.toString(),
+          orElse: () => DrugCategory.other,
+        ),
+        isHighAlert: json['isHighAlert'] == true,
+        commonDosages: (json['commonDosages'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+        interactions: (json['interactions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+        warnings: (json['warnings'] ?? '').toString(),
+        description: json['description']?.toString(),
+      );
+    } catch (e) {
+      print('❌ Error in Drug.fromJson: $e');
+      print('📋 JSON data: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {

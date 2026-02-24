@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/drug_interaction.dart';
 import '../models/medication.dart';
+import '../models/drug.dart';
 import '../providers/health_data_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/drug_interaction_graph.dart';
 
 class DrugInteractionScreen extends StatefulWidget {
@@ -18,30 +20,35 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
   @override
   void initState() {
     super.initState();
-    _buildGraph();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _buildGraph();
+    });
   }
 
   void _buildGraph() {
     final healthData = context.read<HealthDataProvider>();
+    final authProvider = context.read<AuthProvider>();
     final medications = healthData.medications.where((m) => m.isActive).toList();
 
     // Create drug nodes from medications
     final nodes = medications.map((med) {
-      final category = _getDrugCategory(med.name);
+      final drug = _findDrugInDatabase(med.name, authProvider.drugs);
       return DrugNode(
         id: med.id,
         name: med.name,
-        category: category,
+        category: drug?.categoryDisplay ?? 'Other',
       );
     }).toList();
 
-    // Create sample interactions based on known drug interactions
+    // Check interactions using database
     final interactions = <DrugInteraction>[];
-
-    // Check for common interactions
     for (int i = 0; i < medications.length; i++) {
       for (int j = i + 1; j < medications.length; j++) {
-        final interaction = _checkInteraction(medications[i], medications[j]);
+        final interaction = _checkInteractionFromDatabase(
+          medications[i], 
+          medications[j], 
+          authProvider.drugs
+        );
         if (interaction != null) {
           interactions.add(interaction);
         }
@@ -53,267 +60,75 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
     });
   }
 
-  String _getDrugCategory(String drugName) {
-    final name = drugName.toLowerCase();
-    if (name.contains('aspirin') || name.contains('warfarin') || name.contains('heparin')) {
-      return 'Anticoagulant';
-    } else if (name.contains('metformin') || name.contains('glipizide') || name.contains('insulin')) {
-      return 'Antidiabetic';
-    } else if (name.contains('lisinopril') || name.contains('amlodipine') || name.contains('atenolol')) {
-      return 'Cardiovascular';
-    } else if (name.contains('omeprazole') || name.contains('pantoprazole')) {
-      return 'Proton Pump Inhibitor';
-    } else if (name.contains('acetaminophen') || name.contains('ibuprofen')) {
-      return 'Analgesic';
-    } else if (name.contains('atorvastatin') || name.contains('simvastatin')) {
-      return 'Statin';
-    } else if (name.contains('magnesium hydroxide') || 
-               name.contains('calcium carbonate') || 
-               name.contains('sodium bicarbonate') || 
-               name.contains('combination antacid') || 
-               name.contains('aluminium hydroxide') ||
-               name.contains('aluminum hydroxide') ||
-               name.contains('antacid')) {
-      return 'Antacid';
-    }
-    return 'Other';
+  Drug? _findDrugInDatabase(String medicationName, List<Drug> drugs) {
+    final name = medicationName.toLowerCase();
+    return drugs.firstWhere(
+      (d) => name.contains(d.name.toLowerCase()) || name.contains(d.genericName.toLowerCase()),
+      orElse: () => drugs.firstWhere(
+        (d) => d.name.toLowerCase().contains(name) || d.genericName.toLowerCase().contains(name),
+        orElse: () => Drug(
+          id: 'unknown',
+          name: medicationName,
+          genericName: medicationName,
+          category: DrugCategory.other,
+          isHighAlert: false,
+          commonDosages: [],
+          interactions: [],
+          warnings: '',
+        ),
+      ),
+    );
   }
 
-  DrugInteraction? _checkInteraction(Medication drug1, Medication drug2) {
-    final name1 = drug1.name.toLowerCase();
-    final name2 = drug2.name.toLowerCase();
+  DrugInteraction? _checkInteractionFromDatabase(
+    Medication med1, 
+    Medication med2, 
+    List<Drug> drugs
+  ) {
+    final drug1 = _findDrugInDatabase(med1.name, drugs);
+    final drug2 = _findDrugInDatabase(med2.name, drugs);
 
-    // Aspirin + Warfarin (if we had warfarin)
-    if ((name1.contains('aspirin') && name2.contains('warfarin')) ||
-        (name1.contains('warfarin') && name2.contains('aspirin'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Increased risk of bleeding. Aspirin enhances the anticoagulant effect of warfarin.',
-        severity: InteractionSeverity.high,
-        symptoms: ['Easy bruising', 'Nosebleeds', 'Black stools', 'Prolonged bleeding'],
-        recommendation:
-            'Avoid combination unless specifically prescribed by a physician. Monitor INR closely.',
-      );
+    if (drug1 == null || drug2 == null) return null;
+
+    // Check if drug1 lists drug2 in its interactions
+    if (drug1.interactions.contains(drug2.id)) {
+      return _createInteraction(med1, med2, drug1, drug2);
     }
 
-    // Lisinopril + Potassium
-    if ((name1.contains('lisinopril') && name2.contains('potassium')) ||
-        (name1.contains('potassium') && name2.contains('lisinopril'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'ACE inhibitors can cause potassium retention, leading to hyperkalemia.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Muscle weakness', 'Irregular heartbeat', 'Fatigue'],
-        recommendation: 'Monitor potassium levels regularly. Limit potassium-rich foods.',
-      );
-    }
-
-    // Metformin + Contrast dye (simulated)
-    if (name1.contains('metformin') && name2.contains('contrast')) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Contrast dye can affect kidney function, increasing risk of lactic acidosis with metformin.',
-        severity: InteractionSeverity.high,
-        symptoms: ['Lactic acidosis', 'Muscle pain', 'Difficulty breathing', 'Abdominal pain'],
-        recommendation:
-            'Stop metformin 48 hours before and after contrast procedures. Check kidney function.',
-      );
-    }
-
-    // Ibuprofen + Aspirin
-    if ((name1.contains('ibuprofen') && name2.contains('aspirin')) ||
-        (name1.contains('aspirin') && name2.contains('ibuprofen'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Ibuprofen may reduce the cardioprotective effects of aspirin by competing for binding sites.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Reduced aspirin effectiveness', 'Increased cardiovascular risk'],
-        recommendation: 'Take aspirin 30 minutes before ibuprofen, or use an alternative pain reliever.',
-      );
-    }
-
-    // Simvastatin + Grapefruit (simulated)
-    if (name1.contains('simvastatin') && name2.contains('grapefruit')) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Grapefruit inhibits CYP3A4 enzyme, increasing statin levels and risk of muscle toxicity.',
-        severity: InteractionSeverity.high,
-        symptoms: ['Muscle pain', 'Dark urine', 'Fatigue', 'Liver problems'],
-        recommendation: 'Avoid grapefruit and grapefruit juice while on simvastatin.',
-      );
-    }
-
-    // Amlodipine + Simvastatin
-    if ((name1.contains('amlodipine') && name2.contains('simvastatin')) ||
-        (name1.contains('simvastatin') && name2.contains('amlodipine'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Amlodipine inhibits CYP3A4, increasing simvastatin concentration and risk of rhabdomyolysis.',
-        severity: InteractionSeverity.contraindicated,
-        symptoms: ['Severe muscle pain', 'Weakness', 'Dark urine', 'Kidney damage'],
-        recommendation:
-            'Limit simvastatin to 20mg daily when used with amlodipine. Consider alternative statin.',
-      );
-    }
-
-    // Antacids + Antibiotics (e.g., Ciprofloxacin)
-    if ((_isAntacid(name1) && _isAntibiotic(name2)) ||
-        (_isAntacid(name2) && _isAntibiotic(name1))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Antacids reduce the absorption of antibiotics like ciprofloxacin, making them less effective.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Reduced antibiotic effectiveness', 'Treatment failure', 'Recurrent infection'],
-        recommendation: 'Take antibiotic at least 2 hours before or 6 hours after antacids.',
-      );
-    }
-
-    // Antacids + Iron supplements
-    if ((_isAntacid(name1) && name2.contains('iron')) ||
-        (name2.contains('iron') && _isAntacid(name1)) ||
-        (name1.contains('ferrous') && _isAntacid(name2)) ||
-        (name2.contains('ferrous') && _isAntacid(name1))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Antacids significantly reduce iron absorption by binding to it in the gut.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Reduced iron absorption', 'Anemia worsening', 'Fatigue'],
-        recommendation: 'Take iron supplements 2 hours before or after antacids.',
-      );
-    }
-
-    // Antacids + Thyroid medications (Levothyroxine)
-    if ((_isAntacid(name1) && (name2.contains('thyroxine') || name2.contains('levothyroxine'))) ||
-        ((name1.contains('thyroxine') || name1.contains('levothyroxine')) && _isAntacid(name2))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Antacids reduce the absorption of thyroid medications, potentially causing hypothyroidism.',
-        severity: InteractionSeverity.high,
-        symptoms: ['Fatigue', 'Weight gain', 'Cold sensitivity', 'Depression'],
-        recommendation: 'Take thyroid medication at least 4 hours before or after antacids.',
-      );
-    }
-
-    // Multiple antacids interaction - using different types together
-    if (_isAntacid(name1) && _isAntacid(name2)) {
-      // Check if they are different antacids (not the same drug)
-      if (name1 != name2) {
-        return DrugInteraction(
-          id: 'int_${drug1.id}_${drug2.id}',
-          drug1Id: drug1.id,
-          drug2Id: drug2.id,
-          description:
-              'Taking multiple antacids together can lead to excessive neutralization of stomach acid, affecting digestion and absorption of nutrients.',
-          severity: InteractionSeverity.low,
-          symptoms: ['Constipation', 'Diarrhea', 'Bloating', 'Electrolyte imbalance'],
-          recommendation: 'Usually only one antacid is needed. Consult your healthcare provider about which antacid is best for you.',
-        );
-      }
-    }
-
-    // Calcium Carbonate + Magnesium Hydroxide specific interaction
-    if ((name1.contains('calcium carbonate') && name2.contains('magnesium hydroxide')) ||
-        (name1.contains('magnesium hydroxide') && name2.contains('calcium carbonate'))) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Calcium carbonate may cause constipation while magnesium hydroxide has a laxative effect. The combination can balance these effects but may cause unpredictable GI symptoms.',
-        severity: InteractionSeverity.low,
-        symptoms: ['Alternating constipation and diarrhea', 'Bloating', 'Gas'],
-        recommendation: 'Monitor GI symptoms. This combination is generally safe but may cause variable stool consistency.',
-      );
-    }
-
-    // Aluminium Hydroxide + other medications (general slow absorption)
-    if ((name1.contains('aluminium hydroxide') || name1.contains('aluminum hydroxide')) && 
-        !_isAntacid(name2)) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Aluminium hydroxide can reduce the absorption of many medications by binding to them in the gut.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Reduced medication effectiveness'],
-        recommendation: 'Take other medications 2 hours before or after aluminium hydroxide.',
-      );
-    }
-    if ((name2.contains('aluminium hydroxide') || name2.contains('aluminum hydroxide')) && 
-        !_isAntacid(name1)) {
-      return DrugInteraction(
-        id: 'int_${drug1.id}_${drug2.id}',
-        drug1Id: drug1.id,
-        drug2Id: drug2.id,
-        description:
-            'Aluminium hydroxide can reduce the absorption of many medications by binding to them in the gut.',
-        severity: InteractionSeverity.moderate,
-        symptoms: ['Reduced medication effectiveness'],
-        recommendation: 'Take other medications 2 hours before or after aluminium hydroxide.',
-      );
+    // Check if drug2 lists drug1 in its interactions
+    if (drug2.interactions.contains(drug1.id)) {
+      return _createInteraction(med1, med2, drug2, drug1);
     }
 
     return null;
   }
 
-  bool _isAntacid(String drugName) {
-    final name = drugName.toLowerCase();
-    return name.contains('tums') ||
-        name.contains('maalox') ||
-        name.contains('pepcid') ||
-        name.contains('zantac') ||
-        name.contains('prilosec') ||
-        name.contains('omeprazole') ||
-        name.contains('pantoprazole') ||
-        name.contains('lansoprazole') ||
-        name.contains('antacid') ||
-        name.contains('gaviscon') ||
-        // The 5 antacids from the database
-        name.contains('magnesium hydroxide') ||
-        name.contains('calcium carbonate') ||
-        name.contains('sodium bicarbonate') ||
-        name.contains('combination antacid') ||
-        name.contains('aluminium hydroxide') ||
-        name.contains('aluminum hydroxide'); // Alternative spelling
+  DrugInteraction _createInteraction(
+    Medication med1,
+    Medication med2,
+    Drug interactingDrug,
+    Drug otherDrug,
+  ) {
+    // Determine severity based on drug properties
+    InteractionSeverity severity;
+    if (interactingDrug.isHighAlert || otherDrug.isHighAlert) {
+      severity = InteractionSeverity.high;
+    } else {
+      severity = InteractionSeverity.moderate;
+    }
+
+    return DrugInteraction(
+      id: 'int_${med1.id}_${med2.id}',
+      drug1Id: med1.id,
+      drug2Id: med2.id,
+      description: '${interactingDrug.name} may interact with ${otherDrug.name}. ${interactingDrug.warnings}',
+      severity: severity,
+      symptoms: [],
+      recommendation: 'Consult your healthcare provider. ${interactingDrug.warnings}',
+    );
   }
 
-  bool _isAntibiotic(String drugName) {
-    final name = drugName.toLowerCase();
-    return name.contains('ciprofloxacin') ||
-        name.contains('amoxicillin') ||
-        name.contains('azithromycin') ||
-        name.contains('doxycycline') ||
-        name.contains('cephalexin') ||
-        name.contains('antibiotic');
-  }
+
 
   @override
   Widget build(BuildContext context) {

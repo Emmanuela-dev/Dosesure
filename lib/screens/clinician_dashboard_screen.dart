@@ -266,20 +266,26 @@ class _DashboardContentState extends State<_DashboardContent> {
         final selfReportedAdherence = doseLogs.isEmpty ? 0.0 : (doseLogs.where((d) => d.taken).length / doseLogs.length) * 100;
         final verifiedAdherence = doseLogs.isEmpty ? 0.0 : (doseLogs.where((d) => d.taken && d.isVerified).length / doseLogs.length) * 100;
 
-        return GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.5,
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
           children: [
-            _buildOverviewCard('Medications', medications.length.toString(), Icons.medication, Colors.blue),
-            _buildOverviewCard('Side Effects', sideEffects.length.toString(), Icons.warning, Colors.orange),
-            _buildOverviewCard('Herbal Use', herbalUses.length.toString(), Icons.grass, Colors.green),
-            _buildOverviewCard('Self-Reported', '${selfReportedAdherence.toStringAsFixed(0)}%', Icons.check_circle, Colors.blueAccent),
-            _buildOverviewCard('Verified', '${verifiedAdherence.toStringAsFixed(0)}%', Icons.verified, Colors.teal),
-            _buildOverviewCard('Gap', '${(selfReportedAdherence - verifiedAdherence).abs().toStringAsFixed(0)}%', Icons.trending_down, Colors.red),
+            SizedBox(
+              width: (MediaQuery.of(context).size.width - 64) / 2,
+              child: _buildOverviewCard('Medications', medications.length.toString(), Icons.medication, Colors.blue),
+            ),
+            SizedBox(
+              width: (MediaQuery.of(context).size.width - 64) / 2,
+              child: _buildOverviewCard('Side Effects', sideEffects.length.toString(), Icons.warning, Colors.orange),
+            ),
+            SizedBox(
+              width: (MediaQuery.of(context).size.width - 64) / 2,
+              child: _buildOverviewCard('Herbal Use', herbalUses.length.toString(), Icons.grass, Colors.green),
+            ),
+            SizedBox(
+              width: (MediaQuery.of(context).size.width - 64) / 2,
+              child: _buildOverviewCard('Adherence', '${selfReportedAdherence.toStringAsFixed(0)}%', Icons.check_circle, Colors.blueAccent),
+            ),
           ],
         );
       },
@@ -313,6 +319,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(
+          height: 120,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
@@ -325,20 +332,20 @@ class _DashboardContentState extends State<_DashboardContent> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 28),
+              Icon(icon, color: color, size: 32),
               const SizedBox(height: 8),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 title,
-                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -424,13 +431,12 @@ class _DashboardContentState extends State<_DashboardContent> {
               ),
             )).toList(),
           );
-        } else if (title == 'Self-Reported' || title == 'Verified') {
+        } else if (title == 'Adherence') {
           final doseLogs = healthData.doseLogs.where((d) => medIds.contains(d.medicationId)).toList();
-          final isVerified = title == 'Verified';
-          final relevantLogs = isVerified 
-              ? doseLogs.where((log) => log.taken && log.isVerified).toList()
-              : doseLogs.where((log) => log.taken).toList();
-          final adherence = doseLogs.isEmpty ? 0.0 : (relevantLogs.length / doseLogs.length) * 100;
+          final takenLogs = doseLogs.where((log) => log.taken).toList();
+          final verifiedLogs = doseLogs.where((log) => log.taken && log.isVerified).toList();
+          final adherence = doseLogs.isEmpty ? 0.0 : (takenLogs.length / doseLogs.length) * 100;
+          final verifiedAdherence = doseLogs.isEmpty ? 0.0 : (verifiedLogs.length / doseLogs.length) * 100;
           
           return Padding(
             padding: const EdgeInsets.all(8.0),
@@ -438,19 +444,18 @@ class _DashboardContentState extends State<_DashboardContent> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$title Adherence: ${adherence.toStringAsFixed(1)}%',
+                  'Adherence: ${adherence.toStringAsFixed(1)}%',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text('Total doses: ${doseLogs.length}'),
-                Text('${isVerified ? 'Verified' : 'Confirmed'} doses: ${relevantLogs.length}'),
-                if (isVerified) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Verified doses have photo proof',
-                    style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
-                  ),
-                ],
+                Text('Confirmed doses: ${takenLogs.length}'),
+                Text('Verified doses: ${verifiedLogs.length}'),
+                const SizedBox(height: 8),
+                const Text(
+                  'Verified doses have photo proof',
+                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+                ),
               ],
             ),
           );

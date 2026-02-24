@@ -8,10 +8,7 @@ class DrugDatabaseService {
     final drugsRef = _firestore.collection('drugs');
     final snapshot = await drugsRef.limit(1).get();
     
-    if (snapshot.docs.isNotEmpty) {
-      return; // Database already initialized
-    }
-
+    // Always add drugs for now
     final drugs = _getComprehensiveDrugList();
     
     for (var drug in drugs) {
@@ -304,12 +301,30 @@ class DrugDatabaseService {
   }
 
   Future<List<Drug>> getAllDrugs() async {
-    final snapshot = await _firestore.collection('drugs').get();
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return Drug.fromJson(data);
-    }).toList();
+    try {
+      final snapshot = await _firestore.collection('drugs').get();
+      print('DrugDatabaseService.getAllDrugs - Found ${snapshot.docs.length} documents');
+      
+      final drugs = <Drug>[];
+      for (var doc in snapshot.docs) {
+        try {
+          final data = Map<String, dynamic>.from(doc.data());
+          if (!data.containsKey('id')) {
+            data['id'] = doc.id;
+          }
+          final drug = Drug.fromJson(data);
+          drugs.add(drug);
+        } catch (e) {
+          print('Error parsing drug ${doc.id}: $e');
+        }
+      }
+      
+      print('DrugDatabaseService.getAllDrugs - Successfully parsed ${drugs.length} drugs');
+      return drugs;
+    } catch (e) {
+      print('DrugDatabaseService.getAllDrugs - Error: $e');
+      rethrow;
+    }
   }
 
   Future<List<Drug>> getDrugsByCategory(DrugCategory category) async {

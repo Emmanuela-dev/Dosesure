@@ -27,6 +27,7 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
   bool _isSaving = false;
   bool _isLoadingDrugs = true;
   Drug? _selectedDrug;
+  DrugCategory? _selectedCategory;
 
   @override
   void initState() {
@@ -41,15 +42,32 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
     setState(() => _isLoadingDrugs = true);
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      // Always try to initialize and load drugs
       await authProvider.initializeDefaultDrugs();
       debugPrint('PrescribeMedicationScreen - Loaded ${authProvider.drugs.length} drugs');
-    } catch (e) {
-      debugPrint('PrescribeMedicationScreen - Error loading drugs: $e');
+      if (authProvider.drugs.isEmpty) {
+        throw Exception('No drugs loaded from database');
+      }
+    } on Exception catch (e) {
+      debugPrint('PrescribeMedicationScreen - Exception loading drugs: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading drugs: ${e.toString().split('\n').first}'),
+            content: Text('No drugs loaded. Please check your internet connection, Firebase setup, and Firestore rules.\nDetails: ${e.toString()}'),
+            backgroundColor: Colors.orange,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _loadDrugs,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('PrescribeMedicationScreen - Unexpected error loading drugs: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unexpected error loading drugs. Please restart the app or contact support.\nDetails: ${e.toString()}'),
             backgroundColor: Colors.red,
             action: SnackBarAction(
               label: 'Retry',
@@ -262,13 +280,14 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                 ),
                 const SizedBox(height: 16),
                 
-                // Drug selection dropdown
+                // Category and Drug selection
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
+                    debugPrint('Building drug selection - drugs count: ${authProvider.drugs.length}');
                     if (_isLoadingDrugs) {
                       return const InputDecorator(
                         decoration: InputDecoration(
-                          labelText: 'Select Drug',
+                          labelText: 'Loading...',
                           prefixIcon: Icon(Icons.medication),
                           border: OutlineInputBorder(),
                         ),
@@ -286,31 +305,80 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                       );
                     }
                     
+                    if (authProvider.drugs.isEmpty) {
+                      return Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              border: Border.all(color: Colors.orange),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.warning, color: Colors.orange),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'No drugs loaded. Tap refresh to load drug database.',
+                                    style: TextStyle(color: Colors.orange[900]),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _loadDrugs,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Refresh Drug Database'),
+                          ),
+                        ],
+                      );
+                    }
+                    
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        DropdownButtonFormField<Drug>(
-                          value: _selectedDrug,
-                          isExpanded: true,
+                        DropdownButtonFormField<DrugCategory>(
+                          value: _selectedCategory,
                           decoration: InputDecoration(
-                            labelText: 'Select Drug',
-                            prefixIcon: const Icon(Icons.medication),
+                            labelText: 'Drug Category',
+                            prefixIcon: const Icon(Icons.category),
                             border: const OutlineInputBorder(),
-                            hintText: authProvider.drugs.isEmpty 
-                                ? 'No drugs available' 
-                                : 'Choose from available drugs',
                             suffixIcon: IconButton(
                               icon: const Icon(Icons.refresh),
                               onPressed: _loadDrugs,
-                              tooltip: 'Refresh drug list',
                             ),
                           ),
-                          items: [
-                            const DropdownMenuItem<Drug>(
-                              value: null,
-                              child: Text('Enter custom medication name'),
+                          items: DrugCategory.values.map((category) {
+                            return DropdownMenuItem(
+                              value: category,
+                              child: Text(category.name.toUpperCase()),
+                            );
+                          }).toList(),
+                          onChanged: (category) {
+                            setState(() {
+                              _selectedCategory = category;
+                              _selectedDrug = null;
+                              _nameController.clear();
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        if (_selectedCategory != null) ...[
+                          DropdownButtonFormField<Drug>(
+                            value: _selectedDrug,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Select Drug',
+                              prefixIcon: Icon(Icons.medication),
+                              border: OutlineInputBorder(),
                             ),
-                            ...authProvider.drugs.map((drug) {
+                            items: authProvider.drugs
+                                .where((d) => d.category == _selectedCategory)
+                                .map((drug) {
                               return DropdownMenuItem<Drug>(
                                 value: drug,
                                 child: Row(
@@ -320,32 +388,30 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                                     if (drug.isHighAlert) const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        '${drug.name} (${drug.categoryDisplay})',
+                                        drug.name,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
                                 ),
                               );
-                            }),
-                          ],
-                          onChanged: (drug) {
-                            setState(() {
-                              _selectedDrug = drug;
-                              if (drug != null) {
-                                _nameController.text = drug.name;
-                              } else {
-                                _nameController.clear();
+                            }).toList(),
+                            onChanged: (drug) {
+                              setState(() {
+                                _selectedDrug = drug;
+                                if (drug != null) {
+                                  _nameController.text = drug.name;
+                                }
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null) {
+                                return 'Please select a drug';
                               }
-                            });
-                          },
-                          validator: (value) {
-                            if (value == null && _nameController.text.isEmpty) {
-                              return 'Please select a drug or enter a custom name';
-                            }
-                            return null;
-                          },
-                        ),
+                              return null;
+                            },
+                          ),
+                        ],
                         if (authProvider.drugs.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
@@ -451,24 +517,6 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
-                // Custom medication name (shown when no drug is selected)
-                if (_selectedDrug == null)
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Medication Name',
-                      prefixIcon: Icon(Icons.medication),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter medication name';
-                      }
-                      return null;
-                    },
-                  ),
-                if (_selectedDrug == null) const SizedBox(height: 16),
                 TextFormField(
                   controller: _dosageController,
                   decoration: const InputDecoration(
