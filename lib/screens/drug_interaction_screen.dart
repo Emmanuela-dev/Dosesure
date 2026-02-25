@@ -41,7 +41,7 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
     }).toList();
 
     // Check interactions using database
-    final interactions = <DrugInteraction>[];
+    final interactions = <GraphInteraction>[];
     for (int i = 0; i < medications.length; i++) {
       for (int j = i + 1; j < medications.length; j++) {
         final interaction = _checkInteractionFromDatabase(
@@ -80,7 +80,7 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
     );
   }
 
-  DrugInteraction? _checkInteractionFromDatabase(
+  GraphInteraction? _checkInteractionFromDatabase(
     Medication med1, 
     Medication med2, 
     List<Drug> drugs
@@ -103,7 +103,7 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
     return null;
   }
 
-  DrugInteraction _createInteraction(
+  GraphInteraction _createInteraction(
     Medication med1,
     Medication med2,
     Drug interactingDrug,
@@ -117,7 +117,7 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
       severity = InteractionSeverity.moderate;
     }
 
-    return DrugInteraction(
+    return GraphInteraction(
       id: 'int_${med1.id}_${med2.id}',
       drug1Id: med1.id,
       drug2Id: med2.id,
@@ -445,7 +445,7 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
     );
   }
 
-  Widget _buildWarningItem(DrugInteraction interaction) {
+  Widget _buildWarningItem(GraphInteraction interaction) {
     final drug1 = _graph?.nodes.firstWhere((n) => n.id == interaction.drug1Id);
     final drug2 = _graph?.nodes.firstWhere((n) => n.id == interaction.drug2Id);
 
@@ -533,7 +533,7 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
     );
   }
 
-  void _showInteractionDetails(DrugInteraction interaction) {
+  void _showInteractionDetails(GraphInteraction interaction) {
     final drug1 = _graph?.nodes.firstWhere((n) => n.id == interaction.drug1Id);
     final drug2 = _graph?.nodes.firstWhere((n) => n.id == interaction.drug2Id);
 

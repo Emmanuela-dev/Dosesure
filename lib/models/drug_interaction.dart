@@ -1,88 +1,130 @@
-import 'dart:ui';
-import 'dart:math' as math;
+import 'package:flutter/material.dart';
 
-/// Severity levels for drug interactions
-enum InteractionSeverity {
-  low('Low', Color(0xFF4CAF50)),
-  moderate('Moderate', Color(0xFFFF9800)),
-  high('High', Color(0xFFF44336)),
-  contraindicated('Contraindicated', Color(0xFF9C27B0));
-
-  final String displayName;
-  final Color color;
-  const InteractionSeverity(this.displayName, this.color);
-}
-
-/// Represents a single drug in the interaction graph
+// Drug Node for graph visualization
 class DrugNode {
   final String id;
   final String name;
-  final String category; // e.g., "Anticoagulant", "Antihypertensive"
-  final math.Point<double> position;
+  final String category;
   final double radius;
 
   DrugNode({
     required this.id,
     required this.name,
     required this.category,
-    this.position = const math.Point<double>(0, 0),
-    this.radius = 40,
+    this.radius = 40.0,
   });
 }
 
-/// Represents an interaction between two drugs
-class DrugInteraction {
-  final String id;
-  final String drug1Id;
-  final String drug2Id;
-  final String description;
-  final InteractionSeverity severity;
-  final List<String> symptoms; // List of symptoms if this interaction occurs
-  final String recommendation;
-
-  DrugInteraction({
-    required this.id,
-    required this.drug1Id,
-    required this.drug2Id,
-    required this.description,
-    required this.severity,
-    required this.symptoms,
-    required this.recommendation,
-  });
-
-  /// Get the severity color for this interaction
-  Color get severityColor => severity.color;
-}
-
-/// Drug interaction graph data containing nodes and edges
+// Drug Interaction Graph
 class DrugInteractionGraph {
   final List<DrugNode> nodes;
-  final List<DrugInteraction> interactions;
+  final List<GraphInteraction> interactions;
 
   DrugInteractionGraph({
     required this.nodes,
     required this.interactions,
   });
 
-  /// Get all interactions for a specific drug
-  List<DrugInteraction> getInteractionsForDrug(String drugId) {
-    return interactions
-        .where((interaction) =>
-            interaction.drug1Id == drugId || interaction.drug2Id == drugId)
-        .toList();
+  bool hasHighSeverityInteractions(String drugId) {
+    return interactions.any((i) =>
+        (i.drug1Id == drugId || i.drug2Id == drugId) &&
+        (i.severity == InteractionSeverity.high ||
+            i.severity == InteractionSeverity.contraindicated));
   }
 
-  /// Check if a drug has any high severity interactions
-  bool hasHighSeverityInteractions(String drugId) {
-    return getInteractionsForDrug(drugId).any(
-      (interaction) =>
-          interaction.severity == InteractionSeverity.high ||
-          interaction.severity == InteractionSeverity.contraindicated,
+  List<GraphInteraction> getInteractionsForDrug(String drugId) {
+    return interactions.where((i) => i.drug1Id == drugId || i.drug2Id == drugId).toList();
+  }
+}
+
+// Graph Interaction (different from prescription DrugInteraction)
+class GraphInteraction {
+  final String id;
+  final String drug1Id;
+  final String drug2Id;
+  final String description;
+  final InteractionSeverity severity;
+  final List<String> symptoms;
+  final String recommendation;
+
+  GraphInteraction({
+    required this.id,
+    required this.drug1Id,
+    required this.drug2Id,
+    required this.description,
+    required this.severity,
+    this.symptoms = const [],
+    required this.recommendation,
+  });
+
+  Color get severityColor => severity.color;
+}
+
+// Simple DrugInteraction for prescription checking
+class DrugInteraction {
+  final String interactingDrugId;
+  final String interactingDrugName;
+  final String description;
+  final InteractionSeverity severity;
+
+  DrugInteraction({
+    required this.interactingDrugId,
+    required this.interactingDrugName,
+    required this.description,
+    required this.severity,
+  });
+
+  factory DrugInteraction.fromJson(Map<String, dynamic> json) {
+    return DrugInteraction(
+      interactingDrugId: json['interactingDrugId'] ?? '',
+      interactingDrugName: json['interactingDrugName'] ?? '',
+      description: json['description'] ?? '',
+      severity: InteractionSeverity.values.firstWhere(
+        (e) => e.name == json['severity'],
+        orElse: () => InteractionSeverity.moderate,
+      ),
     );
   }
 
-  /// Get all interacting drug pairs
-  List<String> getInteractingDrugPairs() {
-    return interactions.map((e) => '${e.drug1Id}-${e.drug2Id}').toList();
+  Map<String, dynamic> toJson() {
+    return {
+      'interactingDrugId': interactingDrugId,
+      'interactingDrugName': interactingDrugName,
+      'description': description,
+      'severity': severity.name,
+    };
+  }
+}
+
+enum InteractionSeverity {
+  low,
+  moderate,
+  high,
+  contraindicated;
+
+  Color get color {
+    switch (this) {
+      case InteractionSeverity.low:
+        return Colors.yellow[700]!;
+      case InteractionSeverity.moderate:
+        return Colors.orange;
+      case InteractionSeverity.high:
+        return Colors.red;
+      case InteractionSeverity.contraindicated:
+        return Colors.red[900]!;
+    }
+  }
+
+  String get displayName {
+    switch (this) {
+      case InteractionSeverity.low:
+        return 'Low';
+      case InteractionSeverity.moderate:
+        return 'Moderate';
+      case InteractionSeverity.high:
+        return 'High';
+      case InteractionSeverity.contraindicated:
+        return 'Contraindicated';
+    }
   }
 }

@@ -1,3 +1,5 @@
+import 'drug_interaction.dart';
+
 enum DrugCategory {
   anticoagulant,
   antiretroviral,
@@ -19,9 +21,13 @@ class Drug {
   final DrugCategory category;
   final bool isHighAlert;
   final List<String> commonDosages;
-  final List<String> interactions;
+  final List<String> interactions; // Legacy field for simple interactions
+  final List<DrugInteraction> detailedInteractions; // New field for detailed interactions
   final String warnings;
   final String? description;
+  final String? indications;
+  final String? use;
+  final List<String>? brandNames;
 
   Drug({
     required this.id,
@@ -31,8 +37,12 @@ class Drug {
     required this.isHighAlert,
     required this.commonDosages,
     required this.interactions,
+    this.detailedInteractions = const [],
     required this.warnings,
     this.description,
+    this.indications,
+    this.use,
+    this.brandNames,
   });
 
   factory Drug.fromJson(Map<String, dynamic> json) {
@@ -46,6 +56,14 @@ class Drug {
       if (name == null) throw 'Missing required field: name';
       if (category == null) throw 'Missing required field: category';
       
+      // Parse detailed interactions
+      List<DrugInteraction> detailedInteractions = [];
+      if (json['detailedInteractions'] != null) {
+        detailedInteractions = (json['detailedInteractions'] as List<dynamic>)
+            .map((e) => DrugInteraction.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      
       return Drug(
         id: id.toString(),
         name: name.toString(),
@@ -57,8 +75,12 @@ class Drug {
         isHighAlert: json['isHighAlert'] == true,
         commonDosages: (json['commonDosages'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
         interactions: (json['interactions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+        detailedInteractions: detailedInteractions,
         warnings: (json['warnings'] ?? '').toString(),
         description: json['description']?.toString(),
+        indications: json['indications']?.toString(),
+        use: json['use']?.toString(),
+        brandNames: (json['brandNames'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
       );
     } catch (e) {
       print('❌ Error in Drug.fromJson: $e');
@@ -76,8 +98,12 @@ class Drug {
       'isHighAlert': isHighAlert,
       'commonDosages': commonDosages,
       'interactions': interactions,
+      'detailedInteractions': detailedInteractions.map((e) => e.toJson()).toList(),
       'warnings': warnings,
       'description': description,
+      'indications': indications,
+      'use': use,
+      'brandNames': brandNames,
     };
   }
 

@@ -26,6 +26,8 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
   final List<String> _times = [];
   bool _isSaving = false;
   bool _isLoadingDrugs = true;
+  bool _isCheckingInteractions = false;
+  List<Map<String, dynamic>> _detectedInteractions = [];
   Drug? _selectedDrug;
   DrugCategory? _selectedCategory;
 
@@ -130,6 +132,17 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
       return;
     }
 
+    // Check for drug interactions before prescribing
+    if (_selectedDrug != null) {
+      await _checkInteractions();
+      
+      // If interactions detected, show warning dialog
+      if (_detectedInteractions.isNotEmpty) {
+        final shouldContinue = await _showInteractionWarning();
+        if (!shouldContinue) return;
+      }
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -202,6 +215,195 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
         });
       }
     }
+  }
+
+  Future<void> _checkInteractions() async {
+    if (_selectedDrug == null) return;
+    
+    setState(() {
+      _isCheckingInteractions = true;
+      _detectedInteractions = [];
+    });
+
+    try {
+      final firestoreService = FirestoreService();
+      final interactions = await firestoreService.checkDrugInteractions(
+        _selectedDrug!.id,
+        widget.patient.id,
+      );
+      
+      setState(() {
+        _detectedInteractions = interactions;
+      });
+    } catch (e) {
+      debugPrint('Error checking interactions: $e');
+    } finally {
+      setState(() {
+        _isCheckingInteractions = false;
+      });
+    }
+  }
+
+  Future<bool> _showInteractionWarning() async {
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red[700], size: 28),
+            const SizedBox(width: 12),
+            const Text('Drug Interaction Warning'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'The patient is currently taking medications that may interact with ${_selectedDrug!.name}:',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ..._detectedInteractions.map((interaction) {
+                Color severityColor;
+                IconData severityIcon;
+                switch (interaction['severity']) {
+                  case 'contraindicated':
+                    severityColor = Colors.red[900]!;
+                    severityIcon = Icons.block;
+                    break;
+                  case 'high':
+                    severityColor = Colors.red;
+                    severityIcon = Icons.error;
+                    break;
+                  case 'moderate':
+                    severityColor = Colors.orange;
+                    severityIcon = Icons.warning;
+                    break;
+                  default:
+                    severityColor = Colors.yellow[700]!;
+                    severityIcon = Icons.info;
+                }
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: severityColor.withOpacity(0.1),
+                    border: Border.all(color: severityColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(severityIcon, color: severityColor, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${interaction['existingDrug']} ↔ ${interaction['newDrug']}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: severityColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        interaction['description'],
+                        style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Severity: ${interaction['severity'].toUpperCase()}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: severityColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              const SizedBox(height: 16),
+              const Text(
+                'Do you want to proceed with prescribing this medication?',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Type "closely monitoring" to override and prescribe anyway, or cancel to choose a different medication.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('cancel'),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final controller = TextEditingController();
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Confirm Override'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Type "closely monitoring" to confirm:'),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: controller,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: 'closely monitoring',
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        if (controller.text.toLowerCase() == 'closely monitoring') {
+                          Navigator.of(context).pop(true);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please type "closely monitoring" exactly'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Confirm'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true && context.mounted) {
+                Navigator.of(context).pop('override');
+              }
+            },
+            child: const Text('Override', style: TextStyle(color: Colors.orange)),
+          ),
+        ],
+      ),
+    );
+
+    return result == 'override';
   }
 
   @override
@@ -399,8 +601,11 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                             onChanged: (drug) {
                               setState(() {
                                 _selectedDrug = drug;
+                                _detectedInteractions = [];
                                 if (drug != null) {
                                   _nameController.text = drug.name;
+                                  // Check interactions when drug is selected
+                                  _checkInteractions();
                                 }
                               });
                             },
@@ -419,6 +624,105 @@ class _PrescribeMedicationScreenState extends State<PrescribeMedicationScreen> {
                               '${authProvider.drugs.length} drugs available',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        if (_isCheckingInteractions)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text('Checking for drug interactions...'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        if (_detectedInteractions.isNotEmpty && !_isCheckingInteractions)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                border: Border.all(color: Colors.red, width: 2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.warning, color: Colors.red, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${_detectedInteractions.length} DRUG INTERACTION(S) DETECTED',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red[900],
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Patient is taking: ${_detectedInteractions.map((i) => i['existingDrug']).join(', ')}',
+                                    style: TextStyle(
+                                      color: Colors.red[900],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'You will be prompted to review interactions before prescribing.',
+                                    style: TextStyle(
+                                      color: Colors.red[700],
+                                      fontSize: 11,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        if (_selectedDrug != null && _detectedInteractions.isEmpty && !_isCheckingInteractions)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                border: Border.all(color: Colors.green),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'No drug interactions detected with current medications',
+                                      style: TextStyle(
+                                        color: Colors.green[900],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

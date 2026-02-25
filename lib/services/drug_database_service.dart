@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/drug.dart';
+import '../models/drug_interaction.dart';
 
 class DrugDatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -18,26 +19,185 @@ class DrugDatabaseService {
 
   List<Drug> _getComprehensiveDrugList() {
     return [
-      // HIGH-ALERT: ANTICOAGULANTS
+      // HIGH-ALERT: ANTICOAGULANTS (Updated with detailed interactions)
       Drug(
         id: 'warfarin',
         name: 'Warfarin',
-        genericName: 'Warfarin Sodium',
+        genericName: 'Warfarin',
+        brandNames: ['Coumadin', 'Jantoven'],
         category: DrugCategory.anticoagulant,
         isHighAlert: true,
-        commonDosages: ['2mg', '5mg', '10mg'],
-        interactions: ['aspirin', 'ibuprofen', 'amoxicillin', 'rifampin'],
-        warnings: 'Monitor INR regularly. Risk of bleeding. Avoid vitamin K-rich foods.',
+        commonDosages: ['1mg', '3mg', '5mg'],
+        use: 'Vitamin K antagonist used to treat venous thromboembolism, pulmonary embolism, thromboembolism with atrial fibrillation',
+        indications: 'Prophylaxis and treatment of venous thromboembolism, thromboembolism with atrial fibrillation, cardiac valve replacement, post-MI',
+        warnings: 'High-alert anticoagulant. Monitor INR regularly. Risk of bleeding.',
+        interactions: [],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abacavir',
+            interactingDrugName: 'Abacavir',
+            description: 'Abacavir may decrease the excretion rate of Warfarin which could result in a higher serum level.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abametapir',
+            interactingDrugName: 'Abametapir',
+            description: 'The serum concentration of Warfarin can be increased when it is combined with Abametapir.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abatacept',
+            interactingDrugName: 'Abatacept',
+            description: 'The serum concentration of Warfarin can be increased when it is combined with Abatacept.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abciximab',
+            interactingDrugName: 'Abciximab',
+            description: 'The risk or severity of bleeding can be increased when Abciximab is combined with Warfarin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abemaciclib',
+            interactingDrugName: 'Abemaciclib',
+            description: 'The metabolism of Abemaciclib can be increased when combined with Warfarin.',
+            severity: InteractionSeverity.moderate,
+          ),
+        ],
+      ),
+      Drug(
+        id: 'heparin',
+        name: 'Heparin Sodium',
+        genericName: 'Heparin',
+        brandNames: ['Defencath', 'Heparin Leo'],
+        category: DrugCategory.anticoagulant,
+        isHighAlert: true,
+        commonDosages: ['5mL Vial'],
+        use: 'Anticoagulant for thromboprophylaxis and treatment of thrombosis',
+        indications: 'Prophylaxis and treatment of venous thrombosis, prevention of post-operative DVT and PE, atrial fibrillation',
+        warnings: 'High-alert anticoagulant. Monitor aPTT. Risk of bleeding and thrombocytopenia.',
+        interactions: [],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abciximab',
+            interactingDrugName: 'Abciximab',
+            description: 'The risk or severity of bleeding can be increased when Abciximab is combined with Heparin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acebutolol',
+            interactingDrugName: 'Acebutolol',
+            description: 'The risk or severity of hyperkalemia can be increased when Heparin is combined with Acebutolol.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'aceclofenac',
+            interactingDrugName: 'Aceclofenac',
+            description: 'The risk or severity of bleeding and hemorrhage can be increased when Aceclofenac is combined with Heparin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acemetacin',
+            interactingDrugName: 'Acemetacin',
+            description: 'The risk or severity of bleeding and hemorrhage can be increased when Heparin is combined with Acemetacin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acenocoumarol',
+            interactingDrugName: 'Acenocoumarol',
+            description: 'The risk or severity of bleeding can be increased when Heparin is combined with Acenocoumarol.',
+            severity: InteractionSeverity.high,
+          ),
+        ],
+      ),
+      Drug(
+        id: 'enoxaparin',
+        name: 'Enoxaparin',
+        genericName: 'Enoxaparin',
+        category: DrugCategory.anticoagulant,
+        isHighAlert: true,
+        commonDosages: ['40mg/0.4mL', '80mg/0.8mL'],
+        use: 'Low molecular weight heparin for DVT prophylaxis and ischemic complications',
+        indications: 'Prevention of ischemic complications in unstable angina, non-Q-wave MI, DVT prophylaxis, treatment of DVT/PE',
+        warnings: 'High-alert anticoagulant. Monitor anti-Xa levels if needed. Risk of bleeding.',
+        interactions: [],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abciximab',
+            interactingDrugName: 'Abciximab',
+            description: 'The risk or severity of bleeding can be increased when Abciximab is combined with Enoxaparin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acebutolol',
+            interactingDrugName: 'Acebutolol',
+            description: 'The risk or severity of hyperkalemia can be increased when Acebutolol is combined with Enoxaparin.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'aceclofenac',
+            interactingDrugName: 'Aceclofenac',
+            description: 'The risk or severity of bleeding and hemorrhage can be increased when Aceclofenac is combined with Enoxaparin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acemetacin',
+            interactingDrugName: 'Acemetacin',
+            description: 'The risk or severity of bleeding and hemorrhage can be increased when Enoxaparin is combined with Acemetacin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acenocoumarol',
+            interactingDrugName: 'Acenocoumarol',
+            description: 'The risk or severity of bleeding can be increased when Enoxaparin is combined with Acenocoumarol.',
+            severity: InteractionSeverity.high,
+          ),
+        ],
       ),
       Drug(
         id: 'rivaroxaban',
-        name: 'Rivaroxaban (Xarelto)',
+        name: 'Rivaroxaban',
         genericName: 'Rivaroxaban',
+        brandNames: ['Rivaroxaban Accord', 'Rivaroxaban Mylan', 'Xarelto'],
         category: DrugCategory.anticoagulant,
         isHighAlert: true,
         commonDosages: ['10mg', '15mg', '20mg'],
-        interactions: ['aspirin', 'ketoconazole', 'rifampin'],
-        warnings: 'Risk of bleeding. Do not stop abruptly.',
+        use: 'Factor Xa inhibitor for DVT, PE treatment and prevention',
+        indications: 'Prevention of VTE post-surgery, stroke prevention in atrial fibrillation, treatment of DVT/PE',
+        warnings: 'High-alert anticoagulant. Not recommended in severe renal impairment (<30mL/min). Risk of bleeding.',
+        interactions: [],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abacavir',
+            interactingDrugName: 'Abacavir',
+            description: 'Abacavir may decrease the excretion rate of Rivaroxaban which could result in a higher serum level.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abametapir',
+            interactingDrugName: 'Abametapir',
+            description: 'The serum concentration of Rivaroxaban can be increased when it is combined with Abametapir.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abatacept',
+            interactingDrugName: 'Abatacept',
+            description: 'The metabolism of Rivaroxaban can be increased when combined with Abatacept.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abciximab',
+            interactingDrugName: 'Abciximab',
+            description: 'Abciximab may increase the anticoagulant activities of Rivaroxaban.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abemaciclib',
+            interactingDrugName: 'Abemaciclib',
+            description: 'Abemaciclib may decrease the excretion rate of Rivaroxaban which could result in a higher serum level.',
+            severity: InteractionSeverity.moderate,
+          ),
+        ],
       ),
       Drug(
         id: 'apixaban',

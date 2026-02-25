@@ -6,6 +6,7 @@ import '../models/dose_log.dart';
 import '../models/side_effect.dart';
 import '../models/herbal_use.dart';
 import '../models/drug.dart';
+import '../models/drug_interaction.dart';
 import '../models/dose_intake.dart';
 import '../models/comment.dart';
 
@@ -583,79 +584,89 @@ class FirestoreService {
     }).toList();
   }
 
+  // Check for drug interactions
+  Future<List<Map<String, dynamic>>> checkDrugInteractions(
+    String newDrugId,
+    String patientId,
+  ) async {
+    List<Map<String, dynamic>> interactions = [];
+    
+    // Get patient's current active medications
+    final medications = await getMedicationsForUserFuture(patientId);
+    final activeMeds = medications.where((m) => m.isActive).toList();
+    
+    if (activeMeds.isEmpty) {
+      return interactions; // No interactions if no active medications
+    }
+    
+    // Get the new drug details
+    final newDrugDoc = await _drugsCollection.doc(newDrugId).get();
+    if (!newDrugDoc.exists) return interactions;
+    
+    final newDrugData = newDrugDoc.data() as Map<String, dynamic>;
+    newDrugData['id'] = newDrugDoc.id;
+    final newDrug = Drug.fromJson(newDrugData);
+    
+    // Get all drugs to match medication names
+    final allDrugs = await getAllDrugs();
+    final drugMap = {for (var d in allDrugs) d.name.toLowerCase(): d};
+    
+    // Check interactions with each active medication
+    for (var med in activeMeds) {
+      final medDrug = drugMap[med.name.toLowerCase()];
+      if (medDrug == null) continue;
+      
+      // Check if new drug interacts with this medication
+      for (var interaction in newDrug.detailedInteractions) {
+        if (interaction.interactingDrugId == medDrug.id ||
+            interaction.interactingDrugName.toLowerCase() == medDrug.name.toLowerCase()) {
+          interactions.add({
+            'existingDrug': medDrug.name,
+            'newDrug': newDrug.name,
+            'description': interaction.description,
+            'severity': interaction.severity.name,
+          });
+        }
+      }
+      
+      // Check if existing medication interacts with new drug
+      for (var interaction in medDrug.detailedInteractions) {
+        if (interaction.interactingDrugId == newDrug.id ||
+            interaction.interactingDrugName.toLowerCase() == newDrug.name.toLowerCase()) {
+          // Avoid duplicates
+          bool alreadyAdded = interactions.any((i) => 
+            i['existingDrug'] == medDrug.name && i['newDrug'] == newDrug.name);
+          if (!alreadyAdded) {
+            interactions.add({
+              'existingDrug': medDrug.name,
+              'newDrug': newDrug.name,
+              'description': interaction.description,
+              'severity': interaction.severity.name,
+            });
+          }
+        }
+      }
+    }
+    
+    return interactions;
+  }
+
   // Initialize default drugs (call this once on first app start)
   Future<void> initializeDefaultDrugs() async {
     try {
       debugPrint('FirestoreService.initializeDefaultDrugs - Checking if drugs exist...');
       
-      // Default antacid drugs
-      final defaultDrugs = [
-        Drug(
-          id: 'magnesium_hydroxide',
-          genericName: 'Magnesium Hydroxide',
-          name: 'Magnesium Hydroxide',
-          category: DrugCategory.antacid,
-          description: 'Used for relief of heartburn, sour stomach, and indigestion',
-          isHighAlert: false,
-          commonDosages: [],
-          interactions: [],
-          warnings: '',
-        ),
-        Drug(
-          id: 'calcium_carbonate',
-          genericName: 'Calcium Carbonate',
-          name: 'Calcium Carbonate',
-          category: DrugCategory.antacid,
-          description: 'Used as an antacid for heartburn and as a calcium supplement',
-          isHighAlert: false,
-          commonDosages: [],
-          interactions: [],
-          warnings: '',
-        ),
-        Drug(
-          id: 'sodium_bicarbonate',
-          genericName: 'Sodium Bicarbonate',
-          name: 'Sodium Bicarbonate',
-          category: DrugCategory.antacid,
-          description: 'Used for relief of heartburn, indigestion, and sour stomach',
-          isHighAlert: false,
-          commonDosages: [],
-          interactions: [],
-          warnings: '',
-        ),
-        Drug(
-          id: 'combination_antacid',
-          genericName: 'Combination Antacid',
-          name: 'Combination Antacid',
-          category: DrugCategory.antacid,
-          description: 'Combination of multiple antacids for enhanced relief',
-          isHighAlert: false,
-          commonDosages: [],
-          interactions: [],
-          warnings: '',
-        ),
-        Drug(
-          id: 'aluminium_hydroxide',
-          genericName: 'Aluminium Hydroxide',
-          name: 'Aluminium Hydroxide',
-          category: DrugCategory.antacid,
-          description: 'Used to treat heartburn, peptic ulcers, and hyperphosphatemia',
-          isHighAlert: false,
-          commonDosages: [],
-          interactions: [],
-          warnings: '',
-        ),
-      ];
-
-      // Try to check if drugs exist, but don't fail if we can't check
+      // Check if anticoagulants exist
       bool drugsExist = false;
       try {
-        final snapshot = await _drugsCollection.limit(1).get();
+        final snapshot = await _drugsCollection
+            .where('category', isEqualTo: 'anticoagulant')
+            .limit(1)
+            .get();
         drugsExist = snapshot.docs.isNotEmpty;
-        debugPrint('FirestoreService.initializeDefaultDrugs - Existing drugs check: $drugsExist (${snapshot.docs.length} found)');
+        debugPrint('FirestoreService.initializeDefaultDrugs - Anticoagulants exist: $drugsExist');
       } catch (e) {
         debugPrint('FirestoreService.initializeDefaultDrugs - Could not check existing drugs: $e');
-        // Continue anyway - we'll try to create them
       }
       
       if (drugsExist) {
@@ -663,10 +674,13 @@ class FirestoreService {
         return;
       }
 
-      debugPrint('FirestoreService.initializeDefaultDrugs - Creating ${defaultDrugs.length} drugs...');
+      debugPrint('FirestoreService.initializeDefaultDrugs - Creating anticoagulant drugs...');
+      
+      // Define anticoagulant drugs with detailed interactions
+      final anticoagulants = _getAnticoagulantDrugs();
       
       // Add all drugs to Firestore
-      for (final drug in defaultDrugs) {
+      for (final drug in anticoagulants) {
         try {
           await _drugsCollection.doc(drug.id).set(drug.toJson());
           debugPrint('FirestoreService.initializeDefaultDrugs - Added drug: ${drug.name}');
@@ -678,5 +692,243 @@ class FirestoreService {
     } catch (e) {
       debugPrint('FirestoreService.initializeDefaultDrugs - Error: $e');
     }
+  }
+  
+  List<Drug> _getAnticoagulantDrugs() {
+    return [
+      Drug(
+        id: 'warfarin',
+        name: 'Warfarin',
+        genericName: 'Warfarin',
+        brandNames: ['Coumadin', 'Jantoven'],
+        category: DrugCategory.anticoagulant,
+        isHighAlert: true,
+        commonDosages: ['1mg', '3mg', '5mg'],
+        use: 'Vitamin K antagonist used to treat venous thromboembolism, pulmonary embolism, thromboembolism with atrial fibrillation',
+        indications: 'Prophylaxis and treatment of venous thromboembolism, thromboembolism with atrial fibrillation, cardiac valve replacement, post-MI',
+        warnings: 'High-alert anticoagulant. Monitor INR regularly. Risk of bleeding.',
+        interactions: [],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abacavir',
+            interactingDrugName: 'Abacavir',
+            description: 'Abacavir may decrease the excretion rate of Warfarin which could result in a higher serum level.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abametapir',
+            interactingDrugName: 'Abametapir',
+            description: 'The serum concentration of Warfarin can be increased when it is combined with Abametapir.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abatacept',
+            interactingDrugName: 'Abatacept',
+            description: 'The serum concentration of Warfarin can be increased when it is combined with Abatacept.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abciximab',
+            interactingDrugName: 'Abciximab',
+            description: 'The risk or severity of bleeding can be increased when Abciximab is combined with Warfarin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abemaciclib',
+            interactingDrugName: 'Abemaciclib',
+            description: 'The metabolism of Abemaciclib can be increased when combined with Warfarin.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'vitamin_k_foods',
+            interactingDrugName: 'Vitamin K-rich foods',
+            description: 'Vitamin K in foods such as leafy vegetables can reduce warfarin efficacy.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'grapefruit',
+            interactingDrugName: 'Grapefruit Juice',
+            description: 'May interfere with warfarin metabolism and increase INR, increasing the risk of bleeding.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'st_johns_wort',
+            interactingDrugName: 'St. John\'s Wort',
+            description: 'This drug may reduce warfarin efficacy.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'herbal_anticoagulants',
+            interactingDrugName: 'Garlic, ginger, bilberry, danshen, piracetam, ginkgo biloba',
+            description: 'Avoid herbs and supplements with anticoagulant/antiplatelet activity.',
+            severity: InteractionSeverity.moderate,
+          ),
+        ],
+      ),
+      Drug(
+        id: 'heparin',
+        name: 'Heparin Sodium',
+        genericName: 'Heparin',
+        brandNames: ['Defencath', 'Heparin Leo'],
+        category: DrugCategory.anticoagulant,
+        isHighAlert: true,
+        commonDosages: ['5mL Vial'],
+        use: 'Anticoagulant for thromboprophylaxis and treatment of thrombosis',
+        indications: 'Prophylaxis and treatment of venous thrombosis, prevention of post-operative DVT and PE, prevention of clotting in arterial and cardiac surgery, atrial fibrillation',
+        warnings: 'High-alert anticoagulant. Monitor aPTT. Risk of bleeding and thrombocytopenia.',
+        interactions: [],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abciximab',
+            interactingDrugName: 'Abciximab',
+            description: 'The risk or severity of bleeding can be increased when Abciximab is combined with Heparin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acebutolol',
+            interactingDrugName: 'Acebutolol',
+            description: 'The risk or severity of hyperkalemia can be increased when Heparin is combined with Acebutolol.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'aceclofenac',
+            interactingDrugName: 'Aceclofenac',
+            description: 'The risk or severity of bleeding and hemorrhage can be increased when Aceclofenac is combined with Heparin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acemetacin',
+            interactingDrugName: 'Acemetacin',
+            description: 'The risk or severity of bleeding and hemorrhage can be increased when Heparin is combined with Acemetacin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acenocoumarol',
+            interactingDrugName: 'Acenocoumarol',
+            description: 'The risk or severity of bleeding can be increased when Heparin is combined with Acenocoumarol.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'calcium_supplement',
+            interactingDrugName: 'Calcium Supplement',
+            description: 'Heparin decreases calcium levels. Administer calcium supplement.',
+            severity: InteractionSeverity.low,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'herbal_anticoagulants',
+            interactingDrugName: 'Garlic, ginger, bilberry, danshen, piracetam, ginkgo biloba',
+            description: 'Avoid herbs and supplements with anticoagulant/antiplatelet activity.',
+            severity: InteractionSeverity.moderate,
+          ),
+        ],
+      ),
+      Drug(
+        id: 'enoxaparin',
+        name: 'Enoxaparin',
+        genericName: 'Enoxaparin',
+        category: DrugCategory.anticoagulant,
+        isHighAlert: true,
+        commonDosages: ['40mg/0.4mL', '80mg/0.8mL'],
+        use: 'Low molecular weight heparin for DVT prophylaxis and ischemic complications',
+        indications: 'Prevention of ischemic complications in unstable angina, non-Q-wave MI, DVT prophylaxis in surgery, treatment of DVT with or without PE',
+        warnings: 'High-alert anticoagulant. Monitor anti-Xa levels if needed. Risk of bleeding.',
+        interactions: [],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abciximab',
+            interactingDrugName: 'Abciximab',
+            description: 'The risk or severity of bleeding can be increased when Abciximab is combined with Enoxaparin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acebutolol',
+            interactingDrugName: 'Acebutolol',
+            description: 'The risk or severity of hyperkalemia can be increased when Acebutolol is combined with Enoxaparin.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'aceclofenac',
+            interactingDrugName: 'Aceclofenac',
+            description: 'The risk or severity of bleeding and hemorrhage can be increased when Aceclofenac is combined with Enoxaparin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acemetacin',
+            interactingDrugName: 'Acemetacin',
+            description: 'The risk or severity of bleeding and hemorrhage can be increased when Enoxaparin is combined with Acemetacin.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'acenocoumarol',
+            interactingDrugName: 'Acenocoumarol',
+            description: 'The risk or severity of bleeding can be increased when Enoxaparin is combined with Acenocoumarol.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'herbal_anticoagulants',
+            interactingDrugName: 'Garlic, ginger, bilberry, danshen, piracetam, ginkgo biloba',
+            description: 'Avoid herbs and supplements with anticoagulant/antiplatelet activity.',
+            severity: InteractionSeverity.moderate,
+          ),
+        ],
+      ),
+      Drug(
+        id: 'rivaroxaban',
+        name: 'Rivaroxaban',
+        genericName: 'Rivaroxaban',
+        brandNames: ['Rivaroxaban Accord', 'Rivaroxaban Mylan', 'Xarelto'],
+        category: DrugCategory.anticoagulant,
+        isHighAlert: true,
+        commonDosages: ['10mg', '15mg', '20mg'],
+        use: 'Factor Xa inhibitor for DVT, PE treatment and prevention',
+        indications: 'Prevention of VTE post-surgery, stroke prevention in atrial fibrillation, treatment of DVT/PE, reduction of cardiovascular events in CAD/PAD',
+        warnings: 'High-alert anticoagulant. Not recommended in severe renal impairment (<30mL/min). Risk of bleeding.',
+        interactions: [],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abacavir',
+            interactingDrugName: 'Abacavir',
+            description: 'Abacavir may decrease the excretion rate of Rivaroxaban which could result in a higher serum level.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abametapir',
+            interactingDrugName: 'Abametapir',
+            description: 'The serum concentration of Rivaroxaban can be increased when it is combined with Abametapir.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abatacept',
+            interactingDrugName: 'Abatacept',
+            description: 'The metabolism of Rivaroxaban can be increased when combined with Abatacept.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abciximab',
+            interactingDrugName: 'Abciximab',
+            description: 'Abciximab may increase the anticoagulant activities of Rivaroxaban.',
+            severity: InteractionSeverity.high,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'abemaciclib',
+            interactingDrugName: 'Abemaciclib',
+            description: 'Abemaciclib may decrease the excretion rate of Rivaroxaban which could result in a higher serum level.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'herbal_anticoagulants',
+            interactingDrugName: 'Garlic, ginger, bilberry, danshen, piracetam, ginkgo biloba',
+            description: 'Avoid herbs and supplements with anticoagulant/antiplatelet activity.',
+            severity: InteractionSeverity.moderate,
+          ),
+          DrugInteraction(
+            interactingDrugId: 'st_johns_wort',
+            interactingDrugName: 'St. John\'s Wort',
+            description: 'Co-administration will decrease levels of this medication.',
+            severity: InteractionSeverity.moderate,
+          ),
+        ],
+      ),
+    ];
   }
 }

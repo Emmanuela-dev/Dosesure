@@ -5,7 +5,7 @@ import '../models/drug_interaction.dart';
 class DrugInteractionGraphWidget extends StatefulWidget {
   final DrugInteractionGraph graph;
   final Function(String drugId)? onDrugSelected;
-  final Function(DrugInteraction interaction)? onInteractionSelected;
+  final Function(GraphInteraction interaction)? onInteractionSelected;
   final Color primaryColor;
 
   const DrugInteractionGraphWidget({
@@ -286,7 +286,7 @@ class _DrugInteractionGraphWidgetState
     );
   }
 
-  Widget _buildInteractionItem(DrugInteraction interaction, String currentDrugId) {
+  Widget _buildInteractionItem(GraphInteraction interaction, String currentDrugId) {
     final otherDrugId = interaction.drug1Id == currentDrugId ? interaction.drug2Id : interaction.drug1Id;
     final otherDrug = widget.graph.nodes.firstWhere((n) => n.id == otherDrugId);
     
@@ -439,7 +439,7 @@ class _DrugGraphPainter extends CustomPainter {
   }
 
   void _drawInteractionIndicator(
-      Canvas canvas, math.Point<double> start, math.Point<double> end, DrugInteraction interaction) {
+      Canvas canvas, math.Point<double> start, math.Point<double> end, GraphInteraction interaction) {
     final midpoint = Offset(
       (start.x + end.x) / 2,
       (start.y + end.y) / 2,
@@ -483,7 +483,7 @@ class _DrugGraphPainter extends CustomPainter {
     );
   }
 
-  double _getEdgeWidth(DrugInteraction interaction) {
+  double _getEdgeWidth(GraphInteraction interaction) {
     switch (interaction.severity) {
       case InteractionSeverity.low:
         return 2.0;

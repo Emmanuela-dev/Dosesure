@@ -546,13 +546,13 @@ class _DashboardContentState extends State<_DashboardContent> {
     return 'Other';
   }
 
-  DrugInteraction? _checkInteraction(Medication drug1, Medication drug2) {
+  GraphInteraction? _checkInteraction(Medication drug1, Medication drug2) {
     final name1 = drug1.name.toLowerCase();
     final name2 = drug2.name.toLowerCase();
 
     // Antacid + Antacid (example interaction)
     if (_isAntacid(name1) && _isAntacid(name2) && name1 != name2) {
-      return DrugInteraction(
+      return GraphInteraction(
         id: 'int_${drug1.id}_${drug2.id}',
         drug1Id: drug1.id,
         drug2Id: drug2.id,
@@ -568,7 +568,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         (name2.contains('iron') && _isAntacid(name1)) ||
         (name1.contains('ferrous') && _isAntacid(name2)) ||
         (name2.contains('ferrous') && _isAntacid(name1))) {
-      return DrugInteraction(
+      return GraphInteraction(
         id: 'int_${drug1.id}_${drug2.id}',
         drug1Id: drug1.id,
         drug2Id: drug2.id,
