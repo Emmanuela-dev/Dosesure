@@ -5,6 +5,7 @@ import '../models/medication.dart';
 import '../models/drug.dart';
 import '../providers/health_data_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/firestore_service.dart';
 import '../widgets/drug_interaction_graph.dart';
 
 class DrugInteractionScreen extends StatefulWidget {
@@ -364,8 +365,8 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove Medication'),
-        content: Text('Remove ${med.name} from this view? This will not delete the prescription.'),
+        title: const Text('Delete Medication'),
+        content: Text('Permanently delete ${med.name}? This will remove it from the database and stop all alarms.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -373,24 +374,39 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              _removeMedication(med);
+              await _deleteMedication(med);
             },
-            child: const Text('Remove'),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
   }
 
-  void _removeMedication(Medication med) {
-    final healthData = context.read<HealthDataProvider>();
-    healthData.medications.removeWhere((m) => m.id == med.id);
-    _buildGraph();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${med.name} removed from view')),
-    );
+  Future<void> _deleteMedication(Medication med) async {
+    try {
+      final firestoreService = FirestoreService();
+      await firestoreService.deleteMedication(med.id);
+      
+      final healthData = context.read<HealthDataProvider>();
+      healthData.medications.removeWhere((m) => m.id == med.id);
+      
+      _buildGraph();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${med.name} deleted permanently')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting medication: $e')),
+        );
+      }
+    }
   }
 
   Widget _buildGraphSection(BuildContext context) {
