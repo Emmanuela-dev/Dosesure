@@ -349,8 +349,47 @@ class _DrugInteractionScreenState extends State<DrugInteractionScreen> {
                 ),
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 20),
+            color: Colors.red,
+            onPressed: () => _confirmDelete(med),
+            tooltip: 'Remove from view',
+          ),
         ],
       ),
+    );
+  }
+
+  void _confirmDelete(Medication med) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Medication'),
+        content: Text('Remove ${med.name} from this view? This will not delete the prescription.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(context);
+              _removeMedication(med);
+            },
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _removeMedication(Medication med) {
+    final healthData = context.read<HealthDataProvider>();
+    healthData.medications.removeWhere((m) => m.id == med.id);
+    _buildGraph();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${med.name} removed from view')),
     );
   }
 

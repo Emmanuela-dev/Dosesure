@@ -8,7 +8,7 @@ import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
 import 'services/notification_service.dart';
 import 'services/drug_database_service.dart';
-
+// entrypoint of dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -27,7 +27,7 @@ void main() async {
     debugPrint('Initialization error: $e');
     debugPrint('Stack trace: $stackTrace');
   }
-  
+  // entrypoint of flutter
   runApp(const MyApp());
 }
 

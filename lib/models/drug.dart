@@ -2,15 +2,6 @@ import 'drug_interaction.dart';
 
 enum DrugCategory {
   anticoagulant,
-  antiretroviral,
-  antidiabetic,
-  antibiotic,
-  antihypertensive,
-  antacid,
-  analgesic,
-  statin,
-  antidepressant,
-  antimalarial,
   other,
 }
 
@@ -111,24 +102,6 @@ class Drug {
     switch (category) {
       case DrugCategory.anticoagulant:
         return 'Anticoagulant';
-      case DrugCategory.antiretroviral:
-        return 'Antiretroviral';
-      case DrugCategory.antidiabetic:
-        return 'Anti-diabetic';
-      case DrugCategory.antibiotic:
-        return 'Antibiotic';
-      case DrugCategory.antihypertensive:
-        return 'Antihypertensive';
-      case DrugCategory.antacid:
-        return 'Antacid/PPI';
-      case DrugCategory.analgesic:
-        return 'Analgesic';
-      case DrugCategory.statin:
-        return 'Statin';
-      case DrugCategory.antidepressant:
-        return 'Antidepressant';
-      case DrugCategory.antimalarial:
-        return 'Antimalarial';
       case DrugCategory.other:
         return 'Other';
     }
