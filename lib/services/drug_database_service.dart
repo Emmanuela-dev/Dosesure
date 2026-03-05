@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/drug.dart';
+import '../models/drug_interaction.dart';
 
 class DrugDatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -8,11 +9,10 @@ class DrugDatabaseService {
     final drugsRef = _firestore.collection('drugs');
     final snapshot = await drugsRef.limit(1).get();
     
-    if (snapshot.docs.isEmpty) {
-      final drugs = _getComprehensiveDrugList();
-      for (var drug in drugs) {
-        await drugsRef.doc(drug.id).set(drug.toJson());
-      }
+    final drugs = _getComprehensiveDrugList();
+    
+    for (var drug in drugs) {
+      await drugsRef.doc(drug.id).set(drug.toJson());
     }
   }
 
@@ -22,74 +22,100 @@ class DrugDatabaseService {
       Drug(
         id: 'warfarin',
         name: 'Warfarin',
-        genericName: 'Warfarin Sodium',
+        genericName: 'Warfarin',
+        brandNames: ['Coumadin', 'Jantoven'],
         category: DrugCategory.anticoagulant,
         isHighAlert: true,
-        commonDosages: ['2mg', '5mg', '10mg'],
-        interactions: ['abacavir', 'rivaroxaban', 'apixaban', 'ibuprofen'],
-        warnings: 'Monitor INR regularly. Risk of bleeding. Avoid vitamin K-rich foods.',
+        commonDosages: ['1mg', '3mg', '5mg'],
+        use: 'Vitamin K antagonist used to treat venous thromboembolism, pulmonary embolism, thromboembolism with atrial fibrillation',
+        indications: 'Prophylaxis and treatment of venous thromboembolism, thromboembolism with atrial fibrillation, cardiac valve replacement, post-MI',
+        warnings: 'High-alert anticoagulant. Monitor INR regularly. Risk of bleeding.',
+        interactions: ['abacavir'],
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'abacavir',
+            interactingDrugName: 'Abacavir',
+            description: 'Abacavir may decrease the excretion rate of Warfarin which could result in a higher serum level.',
+            severity: InteractionSeverity.high,
+          ),
+        ],
+      ),
+      Drug(
+        id: 'heparin',
+        name: 'Heparin Sodium',
+        genericName: 'Heparin',
+        brandNames: ['Defencath', 'Heparin Leo'],
+        category: DrugCategory.anticoagulant,
+        isHighAlert: true,
+        commonDosages: ['5mL Vial'],
+        use: 'Anticoagulant for thromboprophylaxis and treatment of thrombosis',
+        indications: 'Prophylaxis and treatment of venous thrombosis, prevention of post-operative DVT and PE, atrial fibrillation',
+        warnings: 'High-alert anticoagulant. Monitor aPTT. Risk of bleeding and thrombocytopenia.',
+        interactions: [],
+        detailedInteractions: [],
+      ),
+      Drug(
+        id: 'enoxaparin',
+        name: 'Enoxaparin',
+        genericName: 'Enoxaparin',
+        category: DrugCategory.anticoagulant,
+        isHighAlert: true,
+        commonDosages: ['40mg/0.4mL', '80mg/0.8mL'],
+        use: 'Low molecular weight heparin for DVT prophylaxis and ischemic complications',
+        indications: 'Prevention of ischemic complications in unstable angina, non-Q-wave MI, DVT prophylaxis, treatment of DVT/PE',
+        warnings: 'High-alert anticoagulant. Monitor anti-Xa levels if needed. Risk of bleeding.',
+        interactions: [],
+        detailedInteractions: [],
       ),
       Drug(
         id: 'rivaroxaban',
-        name: 'Rivaroxaban (Xarelto)',
+        name: 'Rivaroxaban',
         genericName: 'Rivaroxaban',
+        brandNames: ['Rivaroxaban Accord', 'Rivaroxaban Mylan', 'Xarelto'],
         category: DrugCategory.anticoagulant,
         isHighAlert: true,
         commonDosages: ['10mg', '15mg', '20mg'],
-        interactions: ['warfarin', 'apixaban'],
-        warnings: 'Risk of bleeding. Do not stop abruptly.',
+        use: 'Factor Xa inhibitor for DVT, PE treatment and prevention',
+        indications: 'Prevention of VTE post-surgery, stroke prevention in atrial fibrillation, treatment of DVT/PE',
+        warnings: 'High-alert anticoagulant. Not recommended in severe renal impairment (<30mL/min). Risk of bleeding.',
+        interactions: [],
+        detailedInteractions: [],
       ),
       Drug(
         id: 'apixaban',
-        name: 'Apixaban (Eliquis)',
+        name: 'Apixaban',
         genericName: 'Apixaban',
+        brandNames: ['Eliquis'],
         category: DrugCategory.anticoagulant,
         isHighAlert: true,
         commonDosages: ['2.5mg', '5mg'],
-        interactions: ['warfarin', 'rivaroxaban'],
+        use: 'Factor Xa inhibitor for stroke prevention and VTE treatment',
+        indications: 'Stroke prevention in atrial fibrillation, treatment and prevention of DVT/PE',
         warnings: 'Risk of bleeding. Monitor renal function.',
-      ),
-      // NON-INTERACTING DRUGS
-      Drug(
-        id: 'paracetamol',
-        name: 'Paracetamol',
-        genericName: 'Acetaminophen',
-        category: DrugCategory.other,
-        isHighAlert: false,
-        commonDosages: ['500mg', '1000mg'],
         interactions: [],
-        warnings: 'Do not exceed 4000mg per day. Risk of liver damage.',
+        detailedInteractions: [],
       ),
-      Drug(
-        id: 'metformin',
-        name: 'Metformin',
-        genericName: 'Metformin HCl',
-        category: DrugCategory.other,
-        isHighAlert: false,
-        commonDosages: ['500mg', '850mg', '1000mg'],
-        interactions: [],
-        warnings: 'Take with food. Monitor kidney function.',
-      ),
+
       // INTERACTING DRUGS
       Drug(
         id: 'abacavir',
         name: 'Abacavir',
-        genericName: 'Abacavir Sulfate',
-        category: DrugCategory.other,
-        isHighAlert: true,
-        commonDosages: ['300mg', '600mg'],
-        interactions: ['warfarin'],
-        warnings: 'May decrease excretion of Warfarin, resulting in higher serum levels. Monitor INR closely.',
-      ),
-      Drug(
-        id: 'ibuprofen',
-        name: 'Ibuprofen',
-        genericName: 'Ibuprofen',
+        genericName: 'Abacavir',
         category: DrugCategory.other,
         isHighAlert: false,
-        commonDosages: ['200mg', '400mg', '600mg'],
+        commonDosages: ['300mg', '600mg'],
+        use: 'An antiviral medication used to treat HIV',
+        indications: 'Treatment of HIV infection in combination with other antiretroviral agents',
+        warnings: 'May interact with anticoagulants. Screen for HLA-B*5701 allele before use.',
         interactions: ['warfarin'],
-        warnings: 'Increases bleeding risk when combined with anticoagulants. Take with food.',
+        detailedInteractions: [
+          DrugInteraction(
+            interactingDrugId: 'warfarin',
+            interactingDrugName: 'Warfarin',
+            description: 'Abacavir may decrease the excretion rate of Warfarin which could result in a higher serum level.',
+            severity: InteractionSeverity.high,
+          ),
+        ],
       ),
     ];
   }

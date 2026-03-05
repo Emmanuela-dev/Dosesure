@@ -23,20 +23,85 @@ void main() async {
   }
   print('Old data cleared.');
   
-  // Add drugs
+  // Add anticoagulant drugs with detailed interactions
   final drugs = [
     // ANTICOAGULANTS
-    {'id': 'warfarin', 'name': 'Warfarin', 'genericName': 'Warfarin Sodium', 'category': 'anticoagulant', 'isHighAlert': true, 'commonDosages': ['2mg', '5mg', '10mg'], 'interactions': ['abacavir', 'rivaroxaban', 'apixaban', 'ibuprofen'], 'warnings': 'Monitor INR regularly. Risk of bleeding. Avoid vitamin K-rich foods.'},
-    {'id': 'rivaroxaban', 'name': 'Rivaroxaban (Xarelto)', 'genericName': 'Rivaroxaban', 'category': 'anticoagulant', 'isHighAlert': true, 'commonDosages': ['10mg', '15mg', '20mg'], 'interactions': ['warfarin', 'apixaban'], 'warnings': 'Risk of bleeding. Do not stop abruptly.'},
-    {'id': 'apixaban', 'name': 'Apixaban (Eliquis)', 'genericName': 'Apixaban', 'category': 'anticoagulant', 'isHighAlert': true, 'commonDosages': ['2.5mg', '5mg'], 'interactions': ['warfarin', 'rivaroxaban'], 'warnings': 'Risk of bleeding. Monitor renal function.'},
-    
-    // NON-INTERACTING DRUGS
-    {'id': 'paracetamol', 'name': 'Paracetamol', 'genericName': 'Acetaminophen', 'category': 'other', 'isHighAlert': false, 'commonDosages': ['500mg', '1000mg'], 'interactions': [], 'warnings': 'Do not exceed 4000mg per day. Risk of liver damage.'},
-    {'id': 'metformin', 'name': 'Metformin', 'genericName': 'Metformin HCl', 'category': 'other', 'isHighAlert': false, 'commonDosages': ['500mg', '850mg', '1000mg'], 'interactions': [], 'warnings': 'Take with food. Monitor kidney function.'},
-    
+    {
+      'id': 'warfarin',
+      'name': 'Warfarin',
+      'genericName': 'Warfarin Sodium',
+      'category': 'anticoagulant',
+      'isHighAlert': true,
+      'commonDosages': ['2mg', '5mg', '10mg'],
+      'interactions': ['abacavir'],
+      'detailedInteractions': [
+        {'interactingDrugId': 'abacavir', 'interactingDrugName': 'Abacavir', 'description': 'Abacavir may decrease the excretion rate of Warfarin which could result in a higher serum level.', 'severity': 'high'},
+      ],
+      'warnings': 'Monitor INR regularly. Risk of bleeding. Avoid vitamin K-rich foods and grapefruit juice.',
+    },
+    {
+      'id': 'rivaroxaban',
+      'name': 'Rivaroxaban',
+      'genericName': 'Rivaroxaban',
+      'brandNames': ['Xarelto'],
+      'category': 'anticoagulant',
+      'isHighAlert': true,
+      'commonDosages': ['10mg', '15mg', '20mg'],
+      'interactions': [],
+      'detailedInteractions': [],
+      'warnings': 'Risk of bleeding. Do not stop abruptly. Monitor renal function.',
+    },
+    {
+      'id': 'apixaban',
+      'name': 'Apixaban',
+      'genericName': 'Apixaban',
+      'brandNames': ['Eliquis'],
+      'category': 'anticoagulant',
+      'isHighAlert': true,
+      'commonDosages': ['2.5mg', '5mg'],
+      'interactions': [],
+      'detailedInteractions': [],
+      'warnings': 'Risk of bleeding. Monitor renal function. Do not crush tablets.',
+    },
+    {
+      'id': 'heparin',
+      'name': 'Heparin',
+      'genericName': 'Heparin Sodium',
+      'category': 'anticoagulant',
+      'isHighAlert': true,
+      'commonDosages': ['5000 units', '10000 units'],
+      'interactions': [],
+      'detailedInteractions': [],
+      'warnings': 'Monitor aPTT. Risk of heparin-induced thrombocytopenia. IV/SC administration only.',
+    },
+    {
+      'id': 'enoxaparin',
+      'name': 'Enoxaparin',
+      'genericName': 'Enoxaparin Sodium',
+      'brandNames': ['Lovenox'],
+      'category': 'anticoagulant',
+      'isHighAlert': true,
+      'commonDosages': ['30mg', '40mg', '60mg'],
+      'interactions': [],
+      'detailedInteractions': [],
+      'warnings': 'Monitor anti-Xa levels in renal impairment. SC injection only.',
+    },
+
     // INTERACTING DRUGS
-    {'id': 'abacavir', 'name': 'Abacavir', 'genericName': 'Abacavir Sulfate', 'category': 'other', 'isHighAlert': true, 'commonDosages': ['300mg', '600mg'], 'interactions': ['warfarin'], 'warnings': 'May decrease excretion of Warfarin, resulting in higher serum levels. Monitor INR closely.'},
-    {'id': 'ibuprofen', 'name': 'Ibuprofen', 'genericName': 'Ibuprofen', 'category': 'other', 'isHighAlert': false, 'commonDosages': ['200mg', '400mg', '600mg'], 'interactions': ['warfarin'], 'warnings': 'Increases bleeding risk when combined with anticoagulants. Take with food.'},
+    {
+      'id': 'abacavir',
+      'name': 'Abacavir',
+      'genericName': 'Abacavir Sulfate',
+      'category': 'other',
+      'isHighAlert': false,
+      'commonDosages': ['300mg', '600mg'],
+      'use': 'An antiviral medication used to treat HIV',
+      'interactions': ['warfarin'],
+      'detailedInteractions': [
+        {'interactingDrugId': 'warfarin', 'interactingDrugName': 'Warfarin', 'description': 'Abacavir may decrease the excretion rate of Warfarin which could result in a higher serum level.', 'severity': 'high'},
+      ],
+      'warnings': 'May interact with anticoagulants. Screen for HLA-B*5701 allele before use.',
+    },
   ];
   
   print('Adding ${drugs.length} drugs to database...');
@@ -48,8 +113,7 @@ void main() async {
   
   print('\n✅ Successfully added ${drugs.length} drugs to Firestore!');
   print('Drugs include:');
-  print('  - 3 Anticoagulants (Warfarin, Rivaroxaban, Apixaban)');
-  print('  - 2 Non-interacting drugs (Paracetamol, Metformin)');
-  print('  - 2 Interacting drugs (Abacavir, Ibuprofen)');
+  print('  - 5 Anticoagulants (Warfarin, Rivaroxaban, Apixaban, Heparin, Enoxaparin)');
+  print('  - 1 Interacting drug (Abacavir)');
   print('\nYou can now test the drug interaction system!');
 }

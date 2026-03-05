@@ -67,6 +67,7 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final userId = authProvider.currentUser!.id;
+      final healthData = Provider.of<HealthDataProvider>(context, listen: false);
       
       String? photoUrl;
       if (_productPhoto != null) {
@@ -74,41 +75,51 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
         photoUrl = await photoService.uploadPhoto(userId, 'herbal_${DateTime.now().millisecondsSinceEpoch}', _productPhoto!);
       }
 
-      final herbalUse = HerbalUse(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _nameController.text.trim(),
-        dosage: _dosageController.text.trim(),
-        frequency: _frequencyController.text.trim(),
-        purpose: _purposeController.text.trim(),
-        startDate: DateTime.now(),
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-        localName: _localNameController.text.trim().isEmpty ? null : _localNameController.text.trim(),
-        botanicalGenus: _botanicalGenusController.text.trim().isEmpty ? null : _botanicalGenusController.text.trim(),
-        preparationMethod: _preparationController.text.trim().isEmpty ? null : _preparationController.text.trim(),
-        geographicOrigin: _originController.text.trim().isEmpty ? null : _originController.text.trim(),
-        photoUrl: photoUrl,
-      );
-
-      await Provider.of<HealthDataProvider>(context, listen: false)
-          .addHerbalUse(userId, herbalUse);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Herbal medicine added successfully')),
-        );
+      final herbalName = _nameController.text.trim().toLowerCase();
+      
+      // Check for interactions with warfarin
+      final hasWarfarin = healthData.medications.any((med) => 
+        med.isActive && med.name.toLowerCase().contains('warfarin'));
+      
+      if (hasWarfarin && (herbalName.contains('grapefruit') || herbalName.contains('st john') || herbalName.contains('st. john'))) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Drug Interaction Alert'),
+                ],
+              ),
+              content: Text(
+                '⚠️ WARNING: ${_nameController.text} may interact with Warfarin.\n\n'
+                'This combination can increase bleeding risk or affect INR levels.\n\n'
+                'Please consult your healthcare provider before using this herbal remedy.',
+                style: TextStyle(fontSize: 14),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _proceedWithHerbalUse(userId, photoUrl);
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                  child: Text('Add Anyway'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
       }
 
-      // Clear form
-      _nameController.clear();
-      _dosageController.clear();
-      _frequencyController.clear();
-      _purposeController.clear();
-      _notesController.clear();
-      _localNameController.clear();
-      _botanicalGenusController.clear();
-      _preparationController.clear();
-      _originController.clear();
-      setState(() => _productPhoto = null);
+      await _proceedWithHerbalUse(userId, photoUrl);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -118,6 +129,44 @@ class _HerbalUseScreenState extends State<HerbalUseScreen> {
     } finally {
       setState(() => _isUploading = false);
     }
+  }
+
+  Future<void> _proceedWithHerbalUse(String userId, String? photoUrl) async {
+    final herbalUse = HerbalUse(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: _nameController.text.trim(),
+      dosage: _dosageController.text.trim(),
+      frequency: _frequencyController.text.trim(),
+      purpose: _purposeController.text.trim(),
+      startDate: DateTime.now(),
+      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      localName: _localNameController.text.trim().isEmpty ? null : _localNameController.text.trim(),
+      botanicalGenus: _botanicalGenusController.text.trim().isEmpty ? null : _botanicalGenusController.text.trim(),
+      preparationMethod: _preparationController.text.trim().isEmpty ? null : _preparationController.text.trim(),
+      geographicOrigin: _originController.text.trim().isEmpty ? null : _originController.text.trim(),
+      photoUrl: photoUrl,
+    );
+
+    await Provider.of<HealthDataProvider>(context, listen: false)
+        .addHerbalUse(userId, herbalUse);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Herbal medicine added successfully')),
+      );
+    }
+
+    // Clear form
+    _nameController.clear();
+    _dosageController.clear();
+    _frequencyController.clear();
+    _purposeController.clear();
+    _notesController.clear();
+    _localNameController.clear();
+    _botanicalGenusController.clear();
+    _preparationController.clear();
+    _originController.clear();
+    setState(() => _productPhoto = null);
   }
 
   @override
