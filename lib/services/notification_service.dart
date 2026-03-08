@@ -133,6 +133,22 @@ class NotificationService {
     debugPrint('Cancelled all reminders');
   }
 
+  /// Stop a specific alarm
+  Future<void> stopAlarm(int alarmId) async {
+    await Alarm.stop(alarmId);
+    debugPrint('Stopped alarm: $alarmId');
+  }
+
+  /// Check if an alarm is ringing
+  bool isAlarmRinging(int alarmId) {
+    return Alarm.getAlarms().any((alarm) => alarm.id == alarmId);
+  }
+
+  /// Get notification ID for medication and time
+  int getNotificationId(String medicationId, int timeIndex) {
+    return _generateNotificationId(medicationId, timeIndex);
+  }
+
   /// Show an immediate test alarm
   Future<void> showTestNotification() async {
     if (!_isInitialized) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:alarm/alarm.dart';
 import '../models/medication.dart';
 import '../models/dose_intake.dart';
 import '../models/dose_log.dart';
@@ -735,6 +736,10 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       statusText = 'Scheduled';
     }
 
+    final timeIndex = medication.times.indexOf(time);
+    final alarmId = NotificationService().getNotificationId(medication.id, timeIndex);
+    final isAlarmRinging = Alarm.hasAlarm(alarmId);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: isUpcoming && !isTaken
@@ -744,43 +749,88 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: InkWell(
-                onTap: () => _confirmDoseIntake(medication, time, healthData),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.touch_app, color: Colors.white, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'TAP TO CONFIRM',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.white,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$time - ${medication.dosage}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
+              child: Column(
+                children: [
+                  if (isAlarmRinging)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade700,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 20),
-                    ],
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.alarm, color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'ALARM RINGING',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              await NotificationService().stopAlarm(alarmId);
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.alarm_off, size: 16),
+                            label: const Text('STOP'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.red.shade700,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              minimumSize: Size.zero,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  InkWell(
+                    onTap: () => _confirmDoseIntake(medication, time, healthData),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.touch_app, color: Colors.white, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'TAP TO CONFIRM',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$time - ${medication.dosage}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 20),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             )
           : Container(
