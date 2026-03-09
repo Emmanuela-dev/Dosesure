@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../models/comment.dart';
 import '../services/firestore_service.dart';
 import '../providers/auth_provider.dart';
-import '../providers/health_data_provider.dart';
 
 class CommentSection extends StatefulWidget {
   final String targetId;

@@ -1,3 +1,47 @@
+# Dosesure Project Summary
+
+## Problem Statement
+Medication non-adherence is a major challenge in healthcare, leading to poor treatment outcomes, increased hospitalizations, and higher healthcare costs. Patients often forget doses, misunderstand instructions, or face barriers to consistent medication intake. Clinicians lack real-time visibility into patient adherence and struggle to detect drug interactions, especially with complex regimens or when herbal/traditional medicines are involved.
+
+## Purpose of the Project
+Dosesure aims to empower patients and clinicians with a smart, user-friendly system for medication management, adherence tracking, and drug interaction detection. The goal is to improve health outcomes, reduce risks, and support evidence-based clinical decisions.
+
+## Proposed Solution
+Dosesure provides a mobile app that automates medication reminders, enables easy dose confirmation (including photo verification), tracks adherence, and visualizes drug interactions. The system integrates with Firebase for secure data storage and real-time updates, offering both patients and clinicians actionable insights.
+
+## Target Users
+- Patients managing one or more medications
+- Clinicians (doctors, nurses, pharmacists) monitoring patient adherence
+- Individuals using herbal or traditional medicines alongside prescribed drugs
+- Caregivers supporting medication routines
+
+## System Features
+- Medication schedule and reminders with exact alarms
+- One-tap dose confirmation and photo verification
+- Dual adherence metrics (self-reported and verified)
+- Drug interaction detection and visualization
+- Side effects and herbal medicine tracking
+- Secure authentication and role-based access
+- Clinician dashboard for patient management and prescription
+- Real-time monitoring and analytics
+
+## Social Impact
+- Reduces medication errors and missed doses
+- Improves patient outcomes and quality of life
+- Supports clinicians with objective adherence data
+- Educates users about drug interactions and risks
+- Promotes safer use of herbal/traditional medicines
+- Contributes to public health by reducing preventable complications
+
+## Technical Overview
+- Built with Flutter (Dart) for cross-platform mobile support
+- Firebase backend for authentication, database, and storage
+- Provider for state management
+- SharedPreferences for local storage
+- flutter_local_notifications for alarm scheduling
+- permission_handler for runtime permissions
+- Modular architecture for scalability and maintainability
+
 # DawaTrack - Smart Medication Management System
 
 DawaTrack is a comprehensive Flutter mobile application designed to help patients manage their medications while providing clinicians with tools to monitor patient adherence and detect potential drug interactions.

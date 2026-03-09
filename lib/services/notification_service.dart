@@ -140,8 +140,9 @@ class NotificationService {
   }
 
   /// Check if an alarm is ringing
-  bool isAlarmRinging(int alarmId) {
-    return Alarm.getAlarms().any((alarm) => alarm.id == alarmId);
+  Future<bool> isAlarmRinging(int alarmId) async {
+    final alarms = await Alarm.getAlarms();
+    return alarms.any((alarm) => alarm.id == alarmId);
   }
 
   /// Get notification ID for medication and time

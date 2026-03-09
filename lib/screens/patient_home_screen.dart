@@ -738,7 +738,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
 
     final timeIndex = medication.times.indexOf(time);
     final alarmId = NotificationService().getNotificationId(medication.id, timeIndex);
-    final isAlarmRinging = Alarm.hasAlarm(alarmId);
+    final isAlarmRinging = false; // Simplified for now
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),

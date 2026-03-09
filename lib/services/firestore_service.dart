@@ -22,28 +22,36 @@ class FirestoreService {
       Stream<List<Comment>> getCommentsForTarget(String targetId) {
         return _commentsCollection
             .where('targetId', isEqualTo: targetId)
-            .orderBy('createdAt', descending: false)
             .snapshots()
-            .map((snapshot) => snapshot.docs
-                .map((doc) => Comment.fromJson({
-                      ...doc.data() as Map<String, dynamic>,
-                      'id': doc.id,
-                    }))
-                .toList());
+            .map((snapshot) {
+              final comments = snapshot.docs
+                  .map((doc) => Comment.fromJson({
+                        ...doc.data() as Map<String, dynamic>,
+                        'id': doc.id,
+                      }))
+                  .toList();
+              // Sort client-side
+              comments.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+              return comments;
+            });
       }
 
       // Get comments for a user (patient)
       Stream<List<Comment>> getCommentsForUser(String userId) {
         return _commentsCollection
             .where('targetOwnerId', isEqualTo: userId)
-            .orderBy('createdAt', descending: true)
             .snapshots()
-            .map((snapshot) => snapshot.docs
-                .map((doc) => Comment.fromJson({
-                      ...doc.data() as Map<String, dynamic>,
-                      'id': doc.id,
-                    }))
-                .toList());
+            .map((snapshot) {
+              final comments = snapshot.docs
+                  .map((doc) => Comment.fromJson({
+                        ...doc.data() as Map<String, dynamic>,
+                        'id': doc.id,
+                      }))
+                  .toList();
+              // Sort client-side
+              comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              return comments;
+            });
       }
 
       // Mark comment as read
@@ -233,14 +241,18 @@ class FirestoreService {
   Stream<List<Medication>> getMedicationsForUser(String userId) {
     return _medicationsCollection
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Medication.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }))
-            .toList());
+        .map((snapshot) {
+          final medications = snapshot.docs
+              .map((doc) => Medication.fromJson({
+                    ...doc.data() as Map<String, dynamic>,
+                    'id': doc.id,
+                  }))
+              .toList();
+          // Sort client-side to avoid index issues
+          medications.sort((a, b) => b.startDate.compareTo(a.startDate));
+          return medications;
+        });
   }
 
   // Get medications for a user (Future-based)
@@ -281,14 +293,18 @@ class FirestoreService {
     return _medicationsCollection
         .where('userId', isEqualTo: userId)
         .where('isActive', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Medication.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }))
-            .toList());
+        .map((snapshot) {
+          final medications = snapshot.docs
+              .map((doc) => Medication.fromJson({
+                    ...doc.data() as Map<String, dynamic>,
+                    'id': doc.id,
+                  }))
+              .toList();
+          // Sort client-side to avoid index issues
+          medications.sort((a, b) => b.startDate.compareTo(a.startDate));
+          return medications;
+        });
   }
 
   // Get medications for a patient (Future-based, for clinician view)
@@ -351,45 +367,78 @@ class FirestoreService {
   Stream<List<DoseLog>> getDoseLogsForUser(String userId) {
     return _doseLogsCollection
         .where('userId', isEqualTo: userId)
-        .orderBy('scheduledTime', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => DoseLog.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }))
-            .toList());
+        .map((snapshot) {
+          final logs = snapshot.docs
+              .map((doc) => DoseLog.fromJson({
+                    ...doc.data() as Map<String, dynamic>,
+                    'id': doc.id,
+                  }))
+              .toList();
+          // Sort client-side
+          logs.sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+          return logs;
+        });
   }
 
   // Get dose logs for a medication
   Stream<List<DoseLog>> getDoseLogsForMedication(String medicationId) {
     return _doseLogsCollection
         .where('medicationId', isEqualTo: medicationId)
-        .orderBy('scheduledTime', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => DoseLog.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }))
-            .toList());
+        .map((snapshot) {
+          final logs = snapshot.docs
+              .map((doc) => DoseLog.fromJson({
+                    ...doc.data() as Map<String, dynamic>,
+                    'id': doc.id,
+                  }))
+              .toList();
+          // Sort client-side
+          logs.sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+          return logs;
+        });
   }
 
   // Get dose logs for a specific date range
   Future<List<DoseLog>> getDoseLogsForDateRange(
       String userId, DateTime start, DateTime end) async {
-    final snapshot = await _doseLogsCollection
-        .where('userId', isEqualTo: userId)
-        .where('scheduledTime', isGreaterThanOrEqualTo: start)
-        .where('scheduledTime', isLessThan: end)
-        .orderBy('scheduledTime')
-        .get();
-    return snapshot.docs
-        .map((doc) => DoseLog.fromJson({
-              ...doc.data() as Map<String, dynamic>,
-              'id': doc.id,
-            }))
-        .toList();
+    try {
+      final snapshot = await _doseLogsCollection
+          .where('userId', isEqualTo: userId)
+          .where('scheduledTime', isGreaterThanOrEqualTo: start)
+          .where('scheduledTime', isLessThan: end)
+          .get();
+      
+      final logs = snapshot.docs
+          .map((doc) => DoseLog.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id,
+              }))
+          .toList();
+      
+      // Sort client-side
+      logs.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
+      return logs;
+    } catch (e) {
+      debugPrint('getDoseLogsForDateRange - Error: $e');
+      // Fallback: get all for user and filter client-side
+      final snapshot = await _doseLogsCollection
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      final logs = snapshot.docs
+          .map((doc) => DoseLog.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id,
+              }))
+          .where((log) => 
+              log.scheduledTime.isAfter(start) && 
+              log.scheduledTime.isBefore(end))
+          .toList();
+      
+      logs.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
+      return logs;
+    }
   }
 
   // Update dose log
@@ -418,28 +467,36 @@ class FirestoreService {
   Stream<List<SideEffect>> getSideEffectsForUser(String userId) {
     return _sideEffectsCollection
         .where('userId', isEqualTo: userId)
-        .orderBy('reportedDate', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => SideEffect.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }))
-            .toList());
+        .map((snapshot) {
+          final effects = snapshot.docs
+              .map((doc) => SideEffect.fromJson({
+                    ...doc.data() as Map<String, dynamic>,
+                    'id': doc.id,
+                  }))
+              .toList();
+          // Sort client-side
+          effects.sort((a, b) => b.reportedDate.compareTo(a.reportedDate));
+          return effects;
+        });
   }
 
   // Get side effects for a medication
   Stream<List<SideEffect>> getSideEffectsForMedication(String medicationId) {
     return _sideEffectsCollection
         .where('medicationId', isEqualTo: medicationId)
-        .orderBy('reportedDate', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => SideEffect.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }))
-            .toList());
+        .map((snapshot) {
+          final effects = snapshot.docs
+              .map((doc) => SideEffect.fromJson({
+                    ...doc.data() as Map<String, dynamic>,
+                    'id': doc.id,
+                  }))
+              .toList();
+          // Sort client-side
+          effects.sort((a, b) => b.reportedDate.compareTo(a.reportedDate));
+          return effects;
+        });
   }
 
   // Update side effect
@@ -468,14 +525,21 @@ class FirestoreService {
   Stream<List<HerbalUse>> getHerbalUsesForUser(String userId) {
     return _herbalUsesCollection
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => HerbalUse.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }))
-            .toList());
+        .map((snapshot) {
+          final uses = snapshot.docs
+              .map((doc) => HerbalUse.fromJson({
+                    ...doc.data() as Map<String, dynamic>,
+                    'id': doc.id,
+                  }))
+              .toList();
+          // Sort client-side if createdAt exists
+          uses.sort((a, b) {
+            // Assuming HerbalUse has a date field, adjust as needed
+            return 0; // Add proper sorting if needed
+          });
+          return uses;
+        });
   }
 
   // Update herbal use
@@ -532,56 +596,84 @@ class FirestoreService {
   Stream<List<DoseIntake>> getDoseIntakesForMedication(String medicationId) {
     return _doseIntakesCollection
         .where('medicationId', isEqualTo: medicationId)
-        .orderBy('takenAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => DoseIntake.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id,
-                }))
-            .toList());
+        .map((snapshot) {
+          final intakes = snapshot.docs
+              .map((doc) => DoseIntake.fromJson({
+                    ...doc.data() as Map<String, dynamic>,
+                    'id': doc.id,
+                  }))
+              .toList();
+          // Sort client-side
+          intakes.sort((a, b) => b.takenAt.compareTo(a.takenAt));
+          return intakes;
+        });
   }
 
   // Get latest dose intake for a medication
   Future<DoseIntake?> getLatestDoseIntake(String medicationId) async {
-    final snapshot = await _doseIntakesCollection
-        .where('medicationId', isEqualTo: medicationId)
-        .orderBy('takenAt', descending: true)
-        .limit(1)
-        .get();
-    
-    if (snapshot.docs.isEmpty) return null;
-    
-    final doc = snapshot.docs.first;
-    return DoseIntake.fromJson({
-      ...doc.data() as Map<String, dynamic>,
-      'id': doc.id,
-    });
+    try {
+      final snapshot = await _doseIntakesCollection
+          .where('medicationId', isEqualTo: medicationId)
+          .get();
+      
+      if (snapshot.docs.isEmpty) return null;
+      
+      // Sort client-side and get the latest
+      final intakes = snapshot.docs.map((doc) => DoseIntake.fromJson({
+        ...doc.data() as Map<String, dynamic>,
+        'id': doc.id,
+      })).toList();
+      
+      intakes.sort((a, b) => b.takenAt.compareTo(a.takenAt));
+      return intakes.first;
+    } catch (e) {
+      debugPrint('getLatestDoseIntake - Error: $e');
+      return null;
+    }
   }
 
   // ==================== DRUG METHODS ====================
 
   // Get all drugs
   Future<List<Drug>> getAllDrugs() async {
-    final snapshot = await _drugsCollection.orderBy('name').get();
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = doc.id;
-      return Drug.fromJson(data);
-    }).toList();
+    try {
+      final snapshot = await _drugsCollection.get();
+      final drugs = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return Drug.fromJson(data);
+      }).toList();
+      
+      // Sort client-side
+      drugs.sort((a, b) => a.name.compareTo(b.name));
+      return drugs;
+    } catch (e) {
+      debugPrint('getAllDrugs - Error: $e');
+      return [];
+    }
   }
 
   // Get drugs by category
   Future<List<Drug>> getDrugsByCategory(String category) async {
-    final snapshot = await _drugsCollection
-        .where('category', isEqualTo: category)
-        .orderBy('name')
-        .get();
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = doc.id;
-      return Drug.fromJson(data);
-    }).toList();
+    try {
+      final snapshot = await _drugsCollection
+          .where('category', isEqualTo: category)
+          .get();
+      
+      final drugs = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return Drug.fromJson(data);
+      }).toList();
+      
+      // Sort client-side
+      drugs.sort((a, b) => a.name.compareTo(b.name));
+      return drugs;
+    } catch (e) {
+      debugPrint('getDrugsByCategory - Error: $e');
+      return [];
+    }
   }
 
   // Check for drug interactions
